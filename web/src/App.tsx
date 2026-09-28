@@ -25,7 +25,11 @@ export default function App() {
           </div>
         </header>
         <main className="flex-1">
-          {route.name === "library" ? <Library /> : <JobPage jobId={route.id} />}
+          {route.name === "library" ? (
+            <Library />
+          ) : (
+            <JobPage jobId={route.id} cookRoute={route.cook} />
+          )}
         </main>
       </div>
     </TooltipProvider>

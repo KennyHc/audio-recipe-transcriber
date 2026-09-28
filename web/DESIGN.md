@@ -102,3 +102,33 @@ minutes" in ink-muted.
 
 No emojis in UI. No orange. No all-caps buttons. No heavy drop shadows on cards.
 Don't show every action as a visible button.
+
+## Cook mode
+
+A full-screen, one-step-at-a-time view for following along at the stove. Readable from
+an arm's length away with messy hands.
+
+- **Entry**: a "Cook" button (lucide `ChefHat` or `Play`) next to Edit in the recipe
+  header — primary styling; Edit becomes secondary. Opens as a full-screen overlay inside
+  the job page (so it shares the scale factor, unit system, and the audio element).
+  Esc, the ✕ button, and the browser back button all exit.
+- **Keep screen awake**: request the Screen Wake Lock (`navigator.wakeLock.request("screen")`)
+  on open, release on exit, re-acquire on `visibilitychange`. Show a tiny ink-faint
+  "Screen stays on" indicator; if unsupported, say nothing.
+- **Slides**: slide 0 "Gather your ingredients" (the checklist, sharing checked state with
+  the recipe page), then one slide per step, then a short "Enjoy your meal" end slide.
+- **Step slide**: "Step 3 of 7" + thin accent progress bar at top; big serif numeral;
+  step text at 28–34px desktop / 22–24px phone, max ~32ch, generous line height.
+  Above the text: chips for the ingredients this step uses (matched from the step text,
+  with scaled/converted quantities). Below: duration/temperature chips, the status pill
+  if the step has a warning, and "Hear this step" (plays the audio from this step's
+  timestamp until the next step's).
+- **Timers**: if a step has `durationMinutes`, a large "Start 9 min timer" button. Timers
+  keep running when you move between steps; running timers show in a slim tray (label =
+  short step text, mm:ss, pause/cancel). On finish: a gentle chime (Web Audio, no files),
+  the timer pulses accent, and it stays until dismissed. Several timers can run at once.
+- **Navigation**: large Previous / Next buttons at the bottom (thumb reach on phones),
+  ←/→ and Space keys, and horizontal swipe on touch. No accidental exits on swipe.
+- **Look**: background/surface tokens, lots of whitespace, no chrome besides the top
+  progress row and bottom nav. Motion: short cross-fade between slides; none with
+  `prefers-reduced-motion`.

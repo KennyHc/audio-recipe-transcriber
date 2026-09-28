@@ -11,12 +11,16 @@ export function RecipeView({
   scaleFactor,
   onSeek,
   currentTime,
+  checkedIngredients,
+  onToggleIngredient,
 }: {
   recipe: Recipe;
   unitSystem: UnitSystem;
   scaleFactor: number;
   onSeek: (seconds: number) => void;
   currentTime: number | null;
+  checkedIngredients: Set<number>;
+  onToggleIngredient: (i: number) => void;
 }) {
   return (
     <div className="print-area space-y-6">
@@ -33,6 +37,8 @@ export function RecipeView({
             scaleFactor={scaleFactor}
             warnings={recipe.warnings}
             onSeek={onSeek}
+            checked={checkedIngredients}
+            onToggle={onToggleIngredient}
           />
         </section>
 

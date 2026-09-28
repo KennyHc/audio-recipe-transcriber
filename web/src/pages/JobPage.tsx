@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Job, Recipe, RecipeVersionMeta, Transcript, VersionedRecipe } from "@recipe/shared";
 import { TERMINAL_STATUSES } from "@recipe/shared";
 import { api } from "@/lib/api";
-import { navigate } from "@/lib/router";
+import { navigate, jobHref, cookHref } from "@/lib/router";
 import { Stepper } from "@/components/Stepper";
 import { RecipeView } from "@/components/RecipeView";
 import { EditRecipe } from "@/components/EditRecipe";
@@ -11,6 +11,8 @@ import { AudioPlayer } from "@/components/AudioPlayer";
 import { TranscriptView } from "@/components/TranscriptView";
 import { ServingsScaler } from "@/components/ServingsScaler";
 import { UnitsToggle } from "@/components/UnitsToggle";
+import { CookMode, type CookModeHandle } from "@/components/cook/CookMode";
+import { decideCookRouteAction } from "@/lib/cook";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
@@ -43,6 +45,7 @@ import {
   Check,
   Clock,
   MoreHorizontal,
+  ChefHat,
 } from "lucide-react";
 
 const SETUP_WHISPER_COMMAND_RE = /`(npm run setup:whisper)`/;
@@ -63,7 +66,7 @@ function JobErrorMessage({ error }: { error: string }) {
   );
 }
 
-export function JobPage({ jobId }: { jobId: string }) {
+export function JobPage({ jobId, cookRoute }: { jobId: string; cookRoute: boolean }) {
   const [job, setJob] = useState<Job | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -81,6 +84,71 @@ export function JobPage({ jobId }: { jobId: string }) {
 
   const [unitSystem, setUnitSystem] = useState<UnitSystem>("original");
   const [scaleFactor, setScaleFactor] = useState(1);
+  const [checkedIngredients, setCheckedIngredients] = useState<Set<number>>(new Set());
+
+  const [cookOpen, setCookOpen] = useState(cookRoute);
+  const openedCookViaPushRef = useRef(false);
+  const interceptedBackRef = useRef(false);
+  const cookHasActiveTimersRef = useRef(false);
+  const cookModeRef = useRef<CookModeHandle>(null);
+
+  function toggleIngredient(i: number) {
+    setCheckedIngredients((prev) => {
+      const next = new Set(prev);
+      if (next.has(i)) next.delete(i);
+      else next.add(i);
+      return next;
+    });
+  }
+  function openCook() {
+    openedCookViaPushRef.current = true;
+    navigate(cookHref(jobId));
+    setCookOpen(true);
+  }
+  function closeCook() {
+    if (interceptedBackRef.current) {
+      // A browser-back navigation was intercepted (timers were running) and we
+      // restored the /cook hash ourselves; land cleanly on the plain job hash
+      // without pushing or popping any further history entries.
+      interceptedBackRef.current = false;
+      window.history.replaceState(null, "", jobHref(jobId));
+    } else if (openedCookViaPushRef.current) {
+      window.history.back();
+    } else {
+      navigate(jobHref(jobId));
+    }
+    openedCookViaPushRef.current = false;
+    setCookOpen(false);
+  }
+
+  // Keep cookOpen in sync with the route, but guard against losing running timers to a
+  // stray browser-back: if the hash moves off /cook while timers are active, restore the
+  // /cook hash (replacing, so history doesn't grow) and ask cook mode to confirm instead
+  // of unmounting it outright.
+  useEffect(() => {
+    const action = decideCookRouteAction({
+      cookRoute,
+      cookOpen,
+      hasActiveTimers: cookHasActiveTimersRef.current,
+    });
+    switch (action) {
+      case "open":
+        setCookOpen(true);
+        break;
+      case "close":
+        setCookOpen(false);
+        break;
+      case "confirm-and-restore":
+        interceptedBackRef.current = true;
+        window.history.replaceState(null, "", cookHref(jobId));
+        cookModeRef.current?.requestCloseWithConfirm();
+        break;
+      case "noop":
+      default:
+        break;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cookRoute]);
 
   const [historyOpen, setHistoryOpen] = useState(false);
   const [reextractConfirmOpen, setReextractConfirmOpen] = useState(false);
@@ -124,6 +192,11 @@ export function JobPage({ jobId }: { jobId: string }) {
     setViewingVersion(null);
     setUnitSystem("original");
     setScaleFactor(1);
+    setCheckedIngredients(new Set());
+    setCookOpen(false);
+    openedCookViaPushRef.current = false;
+    interceptedBackRef.current = false;
+    cookHasActiveTimersRef.current = false;
 
     async function tick() {
       try {
@@ -370,8 +443,14 @@ export function JobPage({ jobId }: { jobId: string }) {
                   </div>
 
                   <div className="no-print flex items-center gap-2 shrink-0">
+                    {!isViewingOld && (
+                      <Button size="sm" onClick={openCook}>
+                        <ChefHat className="h-3.5 w-3.5" /> Cook
+                      </Button>
+                    )}
                     <Button
                       size="sm"
+                      variant="outline"
                       disabled={isViewingOld}
                       onClick={() => setEditing(true)}
                     >
@@ -451,6 +530,8 @@ export function JobPage({ jobId }: { jobId: string }) {
                     scaleFactor={scaleFactor}
                     onSeek={seekTo}
                     currentTime={currentTime}
+                    checkedIngredients={checkedIngredients}
+                    onToggleIngredient={toggleIngredient}
                   />
                 </TabsContent>
                 <TabsContent value="transcript">
@@ -484,6 +565,22 @@ export function JobPage({ jobId }: { jobId: string }) {
             title={job.title ?? job.fileName}
             activeStepText={activeStepText}
           />
+
+          {cookOpen && !editing && !isViewingOld && (
+            <CookMode
+              ref={cookModeRef}
+              recipe={displayedRecipe}
+              unitSystem={unitSystem}
+              scaleFactor={scaleFactor}
+              checkedIngredients={checkedIngredients}
+              onToggleIngredient={toggleIngredient}
+              audioRef={audioRef}
+              onClose={closeCook}
+              onActiveTimersChange={(active) => {
+                cookHasActiveTimersRef.current = active;
+              }}
+            />
+          )}
         </>
       )}
 

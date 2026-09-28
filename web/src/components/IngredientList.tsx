@@ -1,4 +1,3 @@
-import { useState } from "react";
 import type { Ingredient, RecipeWarning } from "@recipe/shared";
 import { convertQuantity, type UnitSystem } from "@/lib/units";
 import { formatQuantity, formatUnit } from "@/lib/format";
@@ -12,22 +11,19 @@ export function IngredientList({
   scaleFactor,
   warnings,
   onSeek,
+  checked,
+  onToggle,
 }: {
   ingredients: Ingredient[];
   unitSystem: UnitSystem;
   scaleFactor: number;
   warnings: RecipeWarning[];
   onSeek: (seconds: number) => void;
+  checked: Set<number>;
+  onToggle: (i: number) => void;
 }) {
-  const [checked, setChecked] = useState<Set<number>>(new Set());
-
   function toggle(i: number) {
-    setChecked((prev) => {
-      const next = new Set(prev);
-      if (next.has(i)) next.delete(i);
-      else next.add(i);
-      return next;
-    });
+    onToggle(i);
   }
 
   return (
