@@ -1,0 +1,21 @@
+node_modules/
+dist/
+.env
+data/
+models/
+*.log
+.DS_Store
+# Eval: real clips and their transcripts are third-party content — keep them local.
+eval/cases/*/audio.*
+eval/cases/*/transcript.json
+!eval/cases/garlic-pasta-messy/transcript.json
+eval/results/
+# Source clips (usually third-party videos) — never commit media
+*.mp3
+*.m4a
+*.wav
+*.mp4
+*.webm
+*.ogg
+*.aac
+*.flac

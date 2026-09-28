@@ -1,0 +1,118 @@
+{
+  "description": "Hand-written messy transcript: sponsor read, tangents, a self-correction (2 -> 3 tbsp butter), a vague glug of oil, parmesan used but never introduced, and a closing mention of a different dish.",
+  "titleKeywords": [
+    "garlic",
+    "pasta|spaghetti"
+  ],
+  "servings": null,
+  "ingredients": [
+    {
+      "item": "spaghetti",
+      "aliases": [
+        "pasta"
+      ],
+      "quantity": 200,
+      "unit": "g",
+      "confidence": [
+        "stated"
+      ]
+    },
+    {
+      "item": "olive oil",
+      "quantity": null,
+      "confidence": [
+        "vague"
+      ]
+    },
+    {
+      "item": "garlic",
+      "quantity": 4,
+      "unit": "clove",
+      "confidence": [
+        "stated"
+      ]
+    },
+    {
+      "item": "butter",
+      "quantity": 3,
+      "unit": "tbsp",
+      "confidence": [
+        "stated"
+      ],
+      "note": "Self-correction: two -> three"
+    },
+    {
+      "item": "parmesan",
+      "quantity": null,
+      "confidence": [
+        "inferred",
+        "vague"
+      ]
+    },
+    {
+      "item": "red pepper flakes",
+      "aliases": [
+        "chili flakes"
+      ],
+      "quantity": null,
+      "optional": true
+    },
+    {
+      "item": "parsley",
+      "quantity": null,
+      "confidence": [
+        "vague"
+      ]
+    },
+    {
+      "item": "pasta water",
+      "optional": true
+    },
+    {
+      "item": "salt",
+      "optional": true
+    },
+    {
+      "item": "black pepper",
+      "aliases": [
+        "pepper"
+      ],
+      "optional": true
+    },
+    {
+      "item": "water",
+      "optional": true,
+      "note": "Pot of water for the pasta; listing it is fine"
+    }
+  ],
+  "forbiddenIngredients": [
+    "shrimp",
+    "lemon"
+  ],
+  "stepsInOrder": [
+    [
+      "boil"
+    ],
+    [
+      "garlic"
+    ],
+    [
+      "butter"
+    ],
+    [
+      "toss"
+    ],
+    [
+      "parmesan"
+    ]
+  ],
+  "mustWarnAbout": [
+    [
+      "parmesan"
+    ],
+    [
+      "olive oil",
+      "glug"
+    ]
+  ]
+}

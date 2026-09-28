@@ -1,0 +1,205 @@
+@import "tailwindcss";
+@import "@fontsource-variable/geist";
+@import "@fontsource/instrument-serif";
+
+@theme {
+  --font-sans: "Geist Variable", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-serif: "Instrument Serif", ui-serif, Georgia, serif;
+}
+
+:root {
+  /* Light (default) — values from web/DESIGN.md */
+  --background: 210 50% 98%;
+  --surface: 0 0% 100%;
+  --sunken: 210 42% 95%;
+
+  --ink: 216 50% 12%;
+  --ink-muted: 214 17% 43%;
+  --ink-faint: 215 16% 61%;
+
+  --border: 214 32% 91%;
+  --border-strong: 213 27% 84%;
+
+  --accent-fill: 206 81% 58%;
+  --accent-text: 207 74% 46%;
+  --accent-tint: 209 84% 95%;
+  --accent-tint-strong: 208 81% 90%;
+
+  /* Caution (vague / warnings) — light blue per DESIGN.md, no yellow/amber */
+  --caution-tint: 208 83% 95%;
+  --caution-border: 208 78% 86%;
+  --caution-text: 207 74% 35%;
+  --caution-icon: 206 81% 58%;
+  --caution-pill-bg: 208 82% 91%;
+  --caution-pill-text: 207 80% 29%;
+
+  --danger: 0 61% 54%;
+
+  --radius: 10px;
+  --radius-control: 8px;
+
+  --shadow-float: 0 1px 2px rgb(15 27 45 / .04), 0 12px 32px -12px rgb(15 27 45 / .18);
+
+  /* Back-compat aliases used across components */
+  --card: var(--surface);
+  --card-foreground: var(--ink);
+  --foreground: var(--ink);
+  --muted: var(--sunken);
+  --muted-foreground: var(--ink-muted);
+  --input: var(--border);
+  --primary: var(--accent-text);
+  --primary-foreground: 0 0% 100%;
+  --secondary: var(--accent-tint-strong);
+  --secondary-foreground: var(--ink);
+  --accent: var(--accent-tint);
+  --accent-foreground: var(--ink);
+  --destructive: var(--danger);
+  --destructive-foreground: 0 0% 100%;
+  --ring: var(--accent-fill);
+}
+
+:root[data-theme="dark"] {
+  --background: 220 49% 8%;
+  --surface: 219 43% 12%;
+  --sunken: 220 46% 10%;
+
+  --ink: 214 47% 93%;
+  --ink-muted: 214 21% 65%;
+  --ink-faint: 213 14% 46%;
+
+  --border: 217 33% 18%;
+  --border-strong: 216 33% 25%;
+
+  --accent-fill: 205 81% 68%;
+  --accent-text: 205 81% 68%;
+  --accent-tint: 212 54% 15%;
+  --accent-tint-strong: 212 51% 22%;
+
+  --caution-tint: 211 57% 15%;
+  --caution-border: 209 55% 26%;
+  --caution-text: 208 78% 78%;
+  --caution-icon: 205 81% 68%;
+  --caution-pill-bg: 211 56% 23%;
+  --caution-pill-text: 208 81% 90%;
+
+  --danger: 4 68% 62%;
+
+  --primary-foreground: 220 49% 8%;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --background: 220 49% 8%;
+    --surface: 219 43% 12%;
+    --sunken: 220 46% 10%;
+
+    --ink: 214 47% 93%;
+    --ink-muted: 214 21% 65%;
+    --ink-faint: 213 14% 46%;
+
+    --border: 217 33% 18%;
+    --border-strong: 216 33% 25%;
+
+    --accent-fill: 205 81% 68%;
+    --accent-text: 205 81% 68%;
+    --accent-tint: 212 54% 15%;
+    --accent-tint-strong: 212 51% 22%;
+
+    --caution-tint: 211 57% 15%;
+    --caution-border: 209 55% 26%;
+    --caution-text: 208 78% 78%;
+    --caution-icon: 205 81% 68%;
+    --caution-pill-bg: 211 56% 23%;
+    --caution-pill-text: 208 81% 90%;
+
+    --danger: 4 68% 62%;
+
+    --primary-foreground: 220 49% 8%;
+  }
+}
+
+/* In @layer base so Tailwind utilities (e.g. border-transparent) can override it;
+   unlayered, it would beat every utility class in Tailwind v4. */
+@layer base {
+  * {
+    border-color: hsl(var(--border));
+  }
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  background-color: hsl(var(--background));
+  color: hsl(var(--ink));
+  font-family: var(--font-sans);
+  font-size: 15px;
+  -webkit-font-smoothing: antialiased;
+  transition: background-color 150ms ease-out, color 150ms ease-out;
+}
+
+.tabular-nums,
+.font-tnum {
+  font-feature-settings: "tnum";
+  font-variant-numeric: tabular-nums;
+}
+
+::selection {
+  background-color: hsl(var(--accent-fill) / 0.25);
+}
+
+/* Visible, accent-colored focus rings everywhere */
+:focus-visible {
+  outline: 2px solid hsl(var(--accent-fill));
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+@keyframes pulse-dot {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.5;
+    transform: scale(0.85);
+  }
+}
+
+.animate-pulse-dot {
+  animation: pulse-dot 1.6s ease-in-out infinite;
+}
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  body {
+    background: white !important;
+    color: black !important;
+  }
+  .print-area {
+    padding: 0 !important;
+    margin: 0 !important;
+    color: black !important;
+  }
+  .print-area * {
+    color: black !important;
+    background: transparent !important;
+    box-shadow: none !important;
+  }
+}

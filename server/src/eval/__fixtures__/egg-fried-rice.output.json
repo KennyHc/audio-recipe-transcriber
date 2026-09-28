@@ -1,0 +1,174 @@
+{
+  "title": "Easy Egg Fried Rice",
+  "description": "A quick, no-frills egg fried rice made with cold day-old rice, eggs, green onion, and a soy sauce-and-salt seasoning. Meant to be a simple side dish rather than a stand-alone main.",
+  "servings": 4,
+  "totalTimeMinutes": null,
+  "ingredients": [
+    {
+      "quantity": 4,
+      "unit": null,
+      "item": "eggs",
+      "prep": null,
+      "sourceText": "I'm going to go ahead and crack four eggs. This is the four portions of fried rice, so that's why I'm using four eggs.",
+      "timestamp": 41,
+      "confidence": "stated"
+    },
+    {
+      "quantity": null,
+      "unit": null,
+      "item": "salt",
+      "prep": null,
+      "sourceText": "season the egg with a little pinch of salt",
+      "timestamp": 60,
+      "confidence": "vague"
+    },
+    {
+      "quantity": 4,
+      "unit": null,
+      "item": "green onions",
+      "prep": "chopped, cut on a slight diagonal",
+      "sourceText": "let's chop four green onions",
+      "timestamp": 79,
+      "confidence": "stated"
+    },
+    {
+      "quantity": null,
+      "unit": null,
+      "item": "cooked rice",
+      "prep": "cold (day-old)",
+      "sourceText": "The main ingredients, the rice, they need to be cold rice. So if you have already take out rice from your Chinese restaurant or something like that, it'll be great. Or a cold rice is already sitting in your refrigerator.",
+      "timestamp": 97,
+      "confidence": "inferred"
+    },
+    {
+      "quantity": 1,
+      "unit": "tablespoon",
+      "item": "avocado oil",
+      "prep": null,
+      "sourceText": "add one tablespoon of oil. I'm using avocado.",
+      "timestamp": 125,
+      "confidence": "stated"
+    },
+    {
+      "quantity": 2,
+      "unit": "tablespoon",
+      "item": "cooking oil",
+      "prep": null,
+      "sourceText": "this is the time we're going to add two more tablespoon of cooking oil. Generous amount.",
+      "timestamp": 169,
+      "confidence": "stated"
+    },
+    {
+      "quantity": null,
+      "unit": null,
+      "item": "salt",
+      "prep": null,
+      "sourceText": "now I'm going to add a little pinch of salt",
+      "timestamp": 197,
+      "confidence": "vague"
+    },
+    {
+      "quantity": 2,
+      "unit": "tablespoons",
+      "item": "soy sauce",
+      "prep": null,
+      "sourceText": "Two tablespoons of soy sauce.",
+      "timestamp": 197,
+      "confidence": "stated"
+    }
+  ],
+  "steps": [
+    {
+      "text": "Crack the eggs into a bowl, season with a pinch of salt, and whisk with chopsticks (this changes the flavor).",
+      "timestamp": 41,
+      "durationMinutes": null,
+      "temperature": null
+    },
+    {
+      "text": "Chop the green onions, cutting them at a slight diagonal angle.",
+      "timestamp": 79,
+      "durationMinutes": null,
+      "temperature": null
+    },
+    {
+      "text": "Heat the wok over high heat and add one tablespoon of oil.",
+      "timestamp": 125,
+      "durationMinutes": null,
+      "temperature": "high heat"
+    },
+    {
+      "text": "Pour in the whisked eggs and scramble.",
+      "timestamp": 139,
+      "durationMinutes": null,
+      "temperature": null
+    },
+    {
+      "text": "When the eggs are about three-quarters cooked, add two more tablespoons of oil and then add the cold rice.",
+      "timestamp": 169,
+      "durationMinutes": null,
+      "temperature": null
+    },
+    {
+      "text": "Season with a pinch of salt and two tablespoons of soy sauce, pouring the soy sauce around the edge of the wok so it sizzles.",
+      "timestamp": 197,
+      "durationMinutes": null,
+      "temperature": null
+    },
+    {
+      "text": "Turn off the heat, add the chopped green onions, and toss everything together.",
+      "timestamp": 231,
+      "durationMinutes": null,
+      "temperature": null
+    }
+  ],
+  "tips": [
+    {
+      "text": "Use cold, day-old rice (leftover takeout rice or rice that's been sitting in the fridge works best).",
+      "timestamp": 97
+    },
+    {
+      "text": "Whisking the egg with chopsticks instead of a fork/whisk noticeably changes the flavor.",
+      "timestamp": 60
+    },
+    {
+      "text": "Cut the green onion on a diagonal so it looks nicer in the finished dish.",
+      "timestamp": 97
+    },
+    {
+      "text": "Pouring the soy sauce around the rim of the hot wok lets it sizzle slightly and gives a smoky 'wok hei' flavor.",
+      "timestamp": 217
+    },
+    {
+      "text": "Feel free to customize the seasoning — some people use ketchup or sriracha instead of (or with) soy sauce.",
+      "timestamp": 169
+    },
+    {
+      "text": "This recipe also works with cauliflower rice.",
+      "timestamp": 243
+    },
+    {
+      "text": "This fried rice is seasoned fairly plainly since it's designed as a side dish paired with other main dishes; if eating it on its own you may want more seasoning.",
+      "timestamp": 328
+    }
+  ],
+  "warnings": [
+    {
+      "kind": "vague_quantity",
+      "message": "Salt amount for seasoning eggs is imprecise ('a little pinch').",
+      "target": "ingredients[1]",
+      "suggestion": "~1/8 to 1/4 teaspoon"
+    },
+    {
+      "kind": "vague_quantity",
+      "message": "Salt amount for final seasoning is imprecise ('a little pinch').",
+      "target": "ingredients[6]",
+      "suggestion": "~1/8 to 1/4 teaspoon"
+    },
+    {
+      "kind": "vague_quantity",
+      "message": "Rice quantity is not specified anywhere in the transcript or recipe.",
+      "target": "ingredients[3]",
+      "suggestion": "~2–3 cups cooked rice (for 4 portions)"
+    }
+  ]
+}

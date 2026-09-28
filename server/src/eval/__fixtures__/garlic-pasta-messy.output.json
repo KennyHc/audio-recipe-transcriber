@@ -1,0 +1,214 @@
+{
+  "title": "Garlic Butter Pasta",
+  "description": "A quick, comforting weeknight pasta made by melting garlic and butter into olive oil, then tossing it with spaghetti, starchy pasta water, and parmesan for a glossy, clinging sauce.",
+  "servings": null,
+  "totalTimeMinutes": 15,
+  "ingredients": [
+    {
+      "quantity": null,
+      "unit": null,
+      "item": "salt",
+      "prep": null,
+      "sourceText": "put a big pot of water on to boil, salt it generously",
+      "timestamp": 15.6,
+      "confidence": "vague"
+    },
+    {
+      "quantity": 200,
+      "unit": "grams",
+      "item": "spaghetti",
+      "prep": null,
+      "sourceText": "take about, let's say two hundred grams of spaghetti, we'll cook that later",
+      "timestamp": 22,
+      "confidence": "stated"
+    },
+    {
+      "quantity": null,
+      "unit": null,
+      "item": "olive oil",
+      "prep": null,
+      "sourceText": "add a good glug of olive oil, just eyeball it",
+      "timestamp": 30.4,
+      "confidence": "vague"
+    },
+    {
+      "quantity": 4,
+      "unit": "cloves",
+      "item": "garlic",
+      "prep": "minced",
+      "sourceText": "take four cloves of garlic, minced, and let that go in the oil until it's fragrant",
+      "timestamp": 38.9,
+      "confidence": "stated"
+    },
+    {
+      "quantity": 3,
+      "unit": "tablespoons",
+      "item": "butter",
+      "prep": null,
+      "sourceText": "now add two tablespoons of butter — actually you know what, make it three, I like it really buttery",
+      "timestamp": 45,
+      "confidence": "stated"
+    },
+    {
+      "quantity": null,
+      "unit": null,
+      "item": "red pepper flakes",
+      "prep": null,
+      "sourceText": "oh also grab some red pepper flakes if you have them, totally optional but I love the heat",
+      "timestamp": 58,
+      "confidence": "vague"
+    },
+    {
+      "quantity": 1,
+      "unit": "cup",
+      "item": "pasta water",
+      "prep": "reserved",
+      "sourceText": "make sure you save a cup of that starchy pasta water before you drain it",
+      "timestamp": 70.2,
+      "confidence": "stated"
+    },
+    {
+      "quantity": null,
+      "unit": null,
+      "item": "parmesan",
+      "prep": null,
+      "sourceText": "now stir in the parmesan, get it nice and glossy",
+      "timestamp": 100.5,
+      "confidence": "inferred"
+    },
+    {
+      "quantity": null,
+      "unit": null,
+      "item": "black pepper",
+      "prep": null,
+      "sourceText": "season with salt and black pepper to taste",
+      "timestamp": 108,
+      "confidence": "vague"
+    },
+    {
+      "quantity": null,
+      "unit": null,
+      "item": "parsley",
+      "prep": "chopped",
+      "sourceText": "finish with a handful of chopped parsley",
+      "timestamp": 108,
+      "confidence": "vague"
+    }
+  ],
+  "steps": [
+    {
+      "text": "Bring a large pot of generously salted water to a boil.",
+      "timestamp": 15.6,
+      "durationMinutes": null,
+      "temperature": null
+    },
+    {
+      "text": "Once boiling, add the spaghetti and cook according to package directions, about 9 minutes.",
+      "timestamp": 63.5,
+      "durationMinutes": 9,
+      "temperature": null
+    },
+    {
+      "text": "Meanwhile, heat a good glug of olive oil in a pan over medium heat.",
+      "timestamp": 30.4,
+      "durationMinutes": null,
+      "temperature": "medium heat"
+    },
+    {
+      "text": "Add the minced garlic and cook in the oil until fragrant, about a minute.",
+      "timestamp": 38.9,
+      "durationMinutes": 1,
+      "temperature": null
+    },
+    {
+      "text": "Add the butter and let it melt into the oil and garlic, swirling the pan so it doesn't burn.",
+      "timestamp": 45,
+      "durationMinutes": null,
+      "temperature": null
+    },
+    {
+      "text": "Stir in red pepper flakes, if using.",
+      "timestamp": 58,
+      "durationMinutes": null,
+      "temperature": null
+    },
+    {
+      "text": "Before draining, reserve a cup of the starchy pasta water. Drain the spaghetti when it's about a minute from done.",
+      "timestamp": 70.2,
+      "durationMinutes": null,
+      "temperature": null
+    },
+    {
+      "text": "Add the drained spaghetti straight into the garlic butter pan along with a splash of the reserved pasta water, and toss to combine.",
+      "timestamp": 86.4,
+      "durationMinutes": null,
+      "temperature": null
+    },
+    {
+      "text": "Stir in the parmesan until the sauce looks glossy, adding another splash of pasta water if it looks dry.",
+      "timestamp": 100.5,
+      "durationMinutes": null,
+      "temperature": null
+    },
+    {
+      "text": "Season with salt and black pepper to taste, and finish with chopped parsley.",
+      "timestamp": 108,
+      "durationMinutes": null,
+      "temperature": null
+    },
+    {
+      "text": "Remove the pan from the heat and let it sit for about 30 seconds before plating so the sauce firms up and clings better.",
+      "timestamp": 120,
+      "durationMinutes": null,
+      "temperature": null
+    },
+    {
+      "text": "Plate the pasta, topping with extra parmesan and cracked pepper.",
+      "timestamp": 126.5,
+      "durationMinutes": null,
+      "temperature": null
+    }
+  ],
+  "tips": [
+    {
+      "text": "The starch in the reserved pasta water is what makes the sauce cling to the noodles instead of pooling at the bottom.",
+      "timestamp": 94
+    },
+    {
+      "text": "If the garlic starts browning too fast, pull the pan off the heat for a second to keep it from burning.",
+      "timestamp": 114
+    }
+  ],
+  "warnings": [
+    {
+      "kind": "vague_quantity",
+      "message": "Parmesan has no specified amount; source only says 'stir in the parmesan'.",
+      "target": "ingredients[7]",
+      "suggestion": "~2/3 to 3/4 cup grated parmesan"
+    },
+    {
+      "kind": "vague_quantity",
+      "message": "Olive oil amount is imprecise ('a good glug of olive oil, just eyeball it').",
+      "target": "ingredients[2]",
+      "suggestion": "~2–3 tablespoons"
+    },
+    {
+      "kind": "vague_quantity",
+      "message": "Parsley amount is imprecise ('a handful of chopped parsley').",
+      "target": "ingredients[9]",
+      "suggestion": "~1/4 cup fresh parsley (or ~2–3 tablespoons chopped)"
+    },
+    {
+      "kind": "vague_quantity",
+      "message": "Salt quantity for the pot is imprecise ('salt it generously').",
+      "target": "ingredients[0]",
+      "suggestion": "~1–2 tablespoons for the pasta water"
+    },
+    {
+      "kind": "vague_quantity",
+      "message": "Red pepper flakes have no specified amount, even though they're listed as an ingredient.",
+      "target": "ingredients[5]",
+      "suggestion": "~1/2 to 1 teaspoon (optional, to taste)"
+    }
+  ]
+}
