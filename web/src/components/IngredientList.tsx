@@ -3,6 +3,7 @@ import { convertQuantity, type UnitSystem } from "@/lib/units";
 import { formatQuantity, formatUnit } from "@/lib/format";
 import { StatusPill } from "@/components/StatusPill";
 import { TimestampButton } from "@/components/TimestampButton";
+import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 
 export function IngredientList({
@@ -41,23 +42,14 @@ export function IngredientList({
             id={`ingredient-${i}`}
             key={i}
             className={cn(
-              "flex items-start gap-3 rounded-md px-2 py-2 transition-colors scroll-mt-24",
+              "checkbox-row flex items-start gap-3 rounded-md px-2 py-2 transition-colors scroll-mt-24",
               targetWarnings.length > 0 && "bg-[hsl(var(--caution-tint))]",
             )}
           >
-            <input
-              type="checkbox"
-              checked={isChecked}
-              onChange={() => toggle(i)}
-              className="mt-1 h-4 w-4 shrink-0 rounded-[4px] accent-[hsl(var(--accent-fill))]"
-              aria-label={`Mark ${ing.item} as done`}
-            />
+            <Checkbox checked={isChecked} onChange={() => toggle(i)} ariaLabel={`Mark ${ing.item} as done`} className="mt-1" />
             <div className="flex-1 min-w-0">
               <label
-                className={cn(
-                  "block max-w-[70ch] text-sm sm:text-base cursor-pointer",
-                  isChecked && "line-through text-[hsl(var(--muted-foreground))]",
-                )}
+                className={cn("checkbox-strike block max-w-[70ch] text-sm sm:text-base cursor-pointer")}
                 onClick={() => toggle(i)}
               >
                 {qtyLabel && <span className="font-semibold tabular-nums">{qtyLabel} </span>}

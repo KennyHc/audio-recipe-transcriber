@@ -193,7 +193,9 @@ export function JobPage({ jobId, cookRoute }: { jobId: string; cookRoute: boolea
     setUnitSystem("original");
     setScaleFactor(1);
     setCheckedIngredients(new Set());
-    setCookOpen(false);
+    // Follow the route rather than forcing closed: this effect runs after the
+    // cookRoute effect on mount, so `false` here broke deep links to #/jobs/:id/cook.
+    setCookOpen(cookRoute);
     openedCookViaPushRef.current = false;
     interceptedBackRef.current = false;
     cookHasActiveTimersRef.current = false;

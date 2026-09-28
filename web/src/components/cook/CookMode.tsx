@@ -10,6 +10,7 @@ import { StatusPill } from "@/components/StatusPill";
 import { IngredientChips } from "@/components/cook/IngredientChips";
 import { TimerTray } from "@/components/cook/TimerTray";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -269,38 +270,47 @@ export const CookMode = forwardRef<CookModeHandle, CookModeProps>(function CookM
         </button>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-4 sm:px-8" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
-        <div key={slideIndex} className="mx-auto max-w-[640px] animate-in fade-in-0 duration-200 py-4 sm:py-10">
-          {isIngredientsSlide && (
-            <IngredientsSlide
-              recipe={recipe}
-              unitSystem={unitSystem}
-              scaleFactor={scaleFactor}
-              checked={checkedIngredients}
-              onToggle={onToggleIngredient}
-            />
-          )}
+      <div
+        className="flex flex-1 flex-col overflow-y-auto px-4 sm:px-8"
+        onTouchStart={onTouchStart}
+        onTouchEnd={onTouchEnd}
+      >
+        <div className="flex min-h-full flex-col">
+          <div
+            key={slideIndex}
+            className="my-auto mx-auto w-full max-w-[640px] animate-in fade-in-0 duration-200 pt-4 pb-[10%] sm:pt-10 sm:pb-[16%]"
+          >
+            {isIngredientsSlide && (
+              <IngredientsSlide
+                recipe={recipe}
+                unitSystem={unitSystem}
+                scaleFactor={scaleFactor}
+                checked={checkedIngredients}
+                onToggle={onToggleIngredient}
+              />
+            )}
 
-          {!isIngredientsSlide && !isEndSlide && (
-            <StepSlide
-              step={recipe.steps[stepIndex]}
-              stepNumber={stepIndex + 1}
-              totalSteps={recipe.steps.length}
-              unitSystem={unitSystem}
-              scaleFactor={scaleFactor}
-              warnings={recipe.warnings.filter((w) => w.target === `steps[${stepIndex}]`)}
-              matches={matchedForStep}
-              checked={checkedIngredients}
-              onToggleIngredient={onToggleIngredient}
-              isHearingThis={hearingStep === stepIndex}
-              onToggleHear={() => setHearingStep((cur) => (cur === stepIndex ? null : stepIndex))}
-              onStartTimer={() =>
-                startTimer(stepIndex, recipe.steps[stepIndex].text.slice(0, 60), recipe.steps[stepIndex].durationMinutes!)
-              }
-            />
-          )}
+            {!isIngredientsSlide && !isEndSlide && (
+              <StepSlide
+                step={recipe.steps[stepIndex]}
+                stepNumber={stepIndex + 1}
+                totalSteps={recipe.steps.length}
+                unitSystem={unitSystem}
+                scaleFactor={scaleFactor}
+                warnings={recipe.warnings.filter((w) => w.target === `steps[${stepIndex}]`)}
+                matches={matchedForStep}
+                checked={checkedIngredients}
+                onToggleIngredient={onToggleIngredient}
+                isHearingThis={hearingStep === stepIndex}
+                onToggleHear={() => setHearingStep((cur) => (cur === stepIndex ? null : stepIndex))}
+                onStartTimer={() =>
+                  startTimer(stepIndex, recipe.steps[stepIndex].text.slice(0, 60), recipe.steps[stepIndex].durationMinutes!)
+                }
+              />
+            )}
 
-          {isEndSlide && <EndSlide onDone={requestClose} />}
+            {isEndSlide && <EndSlide onDone={requestClose} />}
+          </div>
         </div>
       </div>
 
@@ -381,19 +391,15 @@ function IngredientsSlide({
           const unitLabel = formatUnit(converted.unit, converted.quantity);
           const isChecked = checked.has(i);
           return (
-            <li key={i} className="flex items-start gap-3 rounded-md px-2 py-2.5">
-              <input
-                type="checkbox"
+            <li key={i} className="checkbox-row flex items-start gap-3 rounded-md px-2 py-2.5">
+              <Checkbox
                 checked={isChecked}
                 onChange={() => onToggle(i)}
-                className="mt-1.5 h-5 w-5 shrink-0 rounded-[4px] accent-[hsl(var(--accent-fill))]"
-                aria-label={`Mark ${ing.item} as done`}
+                ariaLabel={`Mark ${ing.item} as done`}
+                className="mt-1.5"
               />
               <label
-                className={cn(
-                  "block flex-1 cursor-pointer text-base sm:text-lg",
-                  isChecked && "line-through text-[hsl(var(--ink-faint))]",
-                )}
+                className={cn("checkbox-strike block flex-1 cursor-pointer text-base sm:text-lg")}
                 onClick={() => onToggle(i)}
               >
                 {qtyLabel && <span className="font-semibold tabular-nums">{qtyLabel} </span>}

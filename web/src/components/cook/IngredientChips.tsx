@@ -1,3 +1,4 @@
+import { Check } from "lucide-react";
 import type { MatchedIngredient } from "@/lib/cook";
 import { convertQuantity, type UnitSystem } from "@/lib/units";
 import { formatQuantity, formatUnit } from "@/lib/format";
@@ -34,16 +35,23 @@ export function IngredientChips({
             key={index}
             type="button"
             onClick={() => onToggle(index)}
+            data-checked={isChecked}
+            aria-pressed={isChecked}
             className={cn(
               "inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium tabular-nums transition-colors",
               isChecked
-                ? "border-transparent bg-[hsl(var(--sunken))] text-[hsl(var(--ink-faint))] line-through"
+                ? "border-transparent bg-[hsl(var(--sunken))] text-[hsl(var(--ink-faint))]"
                 : "border-[hsl(var(--border-strong))] bg-[hsl(var(--accent-tint))] text-[hsl(var(--accent-text))]",
             )}
           >
-            {qtyLabel && <span>{qtyLabel}</span>}
-            {unitLabel && <span>{unitLabel}</span>}
-            <span>{ingredient.item}</span>
+            <span className="chip-checkmark">
+              <Check className="h-3 w-3" />
+            </span>
+            <span className="checkbox-strike" data-checked={isChecked}>
+              {qtyLabel && <span>{qtyLabel} </span>}
+              {unitLabel && <span>{unitLabel} </span>}
+              <span>{ingredient.item}</span>
+            </span>
           </button>
         );
       })}
