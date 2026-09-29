@@ -13,6 +13,10 @@ export default defineConfig({
       "@": path.resolve(__dirname, "src"),
     },
   },
+  build: {
+    // Spike-only: include whisper-spike.html as a second build entry (see web/src/spike/).
+    rollupOptions: { input: { main: path.resolve(__dirname, "index.html"), spike: path.resolve(__dirname, "whisper-spike.html") } },
+  },
   server: {
     // 5173 is often taken by other local Vite apps; keep this one predictable.
     port: 5180,

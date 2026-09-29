@@ -22,6 +22,14 @@ export const FFMPEG_PATH = process.env.FFMPEG_PATH ?? "/opt/homebrew/bin/ffmpeg"
 
 export const EXTRACTOR_MODEL = process.env.EXTRACTOR_MODEL ?? "claude-sonnet-5";
 
+// Extractor thinking effort (API backend). "low" is cheaper; "medium" is the tuned default.
+const EFFORTS = ["low", "medium", "high"] as const;
+export const EXTRACTOR_EFFORT: (typeof EFFORTS)[number] = EFFORTS.includes(
+  process.env.EXTRACTOR_EFFORT as (typeof EFFORTS)[number],
+)
+  ? (process.env.EXTRACTOR_EFFORT as (typeof EFFORTS)[number])
+  : "medium";
+
 export const VERIFIER_MODEL = process.env.VERIFIER_MODEL ?? "claude-haiku-4-5";
 
 // How the extractor/verifier reach Claude:

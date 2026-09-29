@@ -1,8 +1,9 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { ExtractedRecipe, type Transcript } from "@recipe/shared";
-import { CLAUDE_BACKEND, EXTRACTOR_MODEL } from "../config.ts";
+import { CLAUDE_BACKEND, EXTRACTOR_EFFORT, EXTRACTOR_MODEL } from "../config.ts";
 import { callClaudeCli } from "../llm/claudeCli.ts";
+import { recordUsage } from "../llm/usage.ts";
 import { EXTRACTOR_SYSTEM, formatTranscriptForPrompt } from "../prompts/extractor.ts";
 
 // Created lazily: in "cli" mode there may be no API key at all.
@@ -31,14 +32,29 @@ export async function extractRecipe(transcript: Transcript): Promise<ExtractedRe
   }
 
   client ??= new Anthropic(); // reads ANTHROPIC_API_KEY
+  const isHaiku45 = EXTRACTOR_MODEL.startsWith("claude-haiku-4-5");
   const response = await client.messages.parse({
     model: EXTRACTOR_MODEL,
     max_tokens: 16000,
-    thinking: { type: "adaptive" },
-    output_config: { effort: "medium", format: zodOutputFormat(ExtractedRecipe) },
+    // Haiku 4.5 predates adaptive thinking and effort; sending either is a 400.
+    ...(isHaiku45
+      ? { output_config: { format: zodOutputFormat(ExtractedRecipe) } }
+      : {
+          thinking: { type: "adaptive" as const },
+          output_config: { effort: EXTRACTOR_EFFORT, format: zodOutputFormat(ExtractedRecipe) },
+        }),
     system: EXTRACTOR_SYSTEM,
     messages: [{ role: "user", content: formatTranscriptForPrompt(transcript) }],
   });
+  recordUsage({
+    stage: "extract",
+    model: EXTRACTOR_MODEL,
+    inputTokens: response.usage.input_tokens,
+    outputTokens: response.usage.output_tokens,
+    cacheReadTokens: response.usage.cache_read_input_tokens ?? 0,
+    cacheWriteTokens: response.usage.cache_creation_input_tokens ?? 0,
+  });
+
 
   if (response.stop_reason === "refusal") {
     throw new ExtractionError("The extractor model refused to process this transcript.");

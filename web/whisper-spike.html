@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Whisper in-browser spike</title>
+    <style>
+      body {
+        font-family: -apple-system, system-ui, sans-serif;
+        max-width: 900px;
+        margin: 2rem auto;
+        padding: 0 1rem;
+        color: #111;
+      }
+      h1 {
+        font-size: 1.25rem;
+      }
+      label {
+        display: block;
+        margin-top: 0.75rem;
+        font-weight: 600;
+        font-size: 0.85rem;
+      }
+      input[type="text"],
+      select {
+        width: 100%;
+        padding: 0.4rem;
+        font-size: 0.9rem;
+        box-sizing: border-box;
+      }
+      button {
+        margin-top: 1rem;
+        padding: 0.5rem 1rem;
+        font-size: 0.95rem;
+        cursor: pointer;
+      }
+      button:disabled {
+        cursor: not-allowed;
+        opacity: 0.5;
+      }
+      pre {
+        background: #f5f5f5;
+        padding: 0.75rem;
+        border-radius: 4px;
+        overflow: auto;
+        max-height: 300px;
+        font-size: 0.8rem;
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+      .row {
+        display: flex;
+        gap: 1rem;
+      }
+      .row > div {
+        flex: 1;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Whisper in-browser spike</h1>
+    <p>
+      Device this will use: <strong id="device-label"></strong> (WebGPU preferred, falls back to WASM).
+      Not part of the app UI — throwaway spike page.
+    </p>
+
+    <label for="audio-url">Audio URL</label>
+    <input type="text" id="audio-url" />
+
+    <label for="audio-file">…or pick a local file (overrides URL)</label>
+    <input type="file" id="audio-file" accept="audio/*" />
+
+    <div class="row">
+      <div>
+        <label for="model-select">Model</label>
+        <select id="model-select"></select>
+      </div>
+      <div>
+        <label for="dtype-select">dtype</label>
+        <select id="dtype-select"></select>
+      </div>
+    </div>
+
+    <button id="run-btn">Run transcription</button>
+    <button id="download-btn" disabled>Download transcript.json</button>
+
+    <label>Status / progress</label>
+    <pre id="status"></pre>
+
+    <label>Metrics</label>
+    <pre id="metrics"></pre>
+
+    <label>Transcript (our Transcript shape)</label>
+    <pre id="output"></pre>
+
+    <script type="module" src="/src/spike/main.ts"></script>
+  </body>
+</html>

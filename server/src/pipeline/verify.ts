@@ -3,6 +3,7 @@ import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { type ExtractedRecipe, type RecipeWarning, type Transcript, VerifierOutput } from "@recipe/shared";
 import { CLAUDE_BACKEND, VERIFIER_MODEL } from "../config.ts";
 import { callClaudeCli } from "../llm/claudeCli.ts";
+import { recordUsage } from "../llm/usage.ts";
 import { formatVerifierUserMessage, VERIFIER_SYSTEM } from "../prompts/verifier.ts";
 
 // Created lazily: in "cli" mode there may be no API key at all.
@@ -73,6 +74,15 @@ async function callVerifier(
     system: VERIFIER_SYSTEM,
     messages: [{ role: "user", content: formatVerifierUserMessage(transcript, recipe) }],
   });
+  recordUsage({
+    stage: "verify",
+    model: VERIFIER_MODEL,
+    inputTokens: response.usage.input_tokens,
+    outputTokens: response.usage.output_tokens,
+    cacheReadTokens: response.usage.cache_read_input_tokens ?? 0,
+    cacheWriteTokens: response.usage.cache_creation_input_tokens ?? 0,
+  });
+
 
   if (response.stop_reason === "refusal") {
     throw new VerificationError("The verifier model refused to process this recipe.");

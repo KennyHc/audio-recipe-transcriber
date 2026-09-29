@@ -1,4 +1,7 @@
-// npm run eval -w server [-- --case <name>] [-- --runs N]
+// npm run eval -w server [-- --case <name>] [-- --runs N] [-- --dry-run]
+//
+// --dry-run (API backend only): counts each case's extractor input tokens with the
+// free token-counting endpoint and prints the input cost, without generating anything.
 //
 // Runs every case in eval/cases/ (or a single one with --case) through
 // transcribe (if needed) -> extract -> verify -> score against its
@@ -13,7 +16,10 @@ import { existsSync } from "node:fs";
 import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { Recipe, Transcript, type RecipeWarning } from "@recipe/shared";
-import { CLAUDE_BACKEND, EXTRACTOR_MODEL, VERIFIER_MODEL } from "../config.ts";
+import Anthropic from "@anthropic-ai/sdk";
+import { CLAUDE_BACKEND, EXTRACTOR_EFFORT, EXTRACTOR_MODEL, VERIFIER_MODEL } from "../config.ts";
+import { costUsd, priceFor, takeUsage, type UsageRecord } from "../llm/usage.ts";
+import { EXTRACTOR_SYSTEM, formatTranscriptForPrompt } from "../prompts/extractor.ts";
 import { REPO_ROOT } from "../storage.ts";
 import { extractRecipe, ExtractionError } from "../pipeline/extract.ts";
 import { verifyRecipe, VerificationError } from "../pipeline/verify.ts";
@@ -27,12 +33,15 @@ const CASES_ROOT = path.join(EVAL_ROOT, "cases");
 interface CliArgs {
   case?: string;
   runs: number;
+  dryRun: boolean;
 }
 
 function parseArgs(argv: string[]): CliArgs {
-  const args: CliArgs = { runs: 1 };
+  const args: CliArgs = { runs: 1, dryRun: false };
   for (let i = 0; i < argv.length; i++) {
-    if (argv[i] === "--case") {
+    if (argv[i] === "--dry-run") {
+      args.dryRun = true;
+    } else if (argv[i] === "--case") {
       args.case = argv[++i];
     } else if (argv[i] === "--runs") {
       const n = Number(argv[++i]);
@@ -41,7 +50,7 @@ function parseArgs(argv: string[]): CliArgs {
       }
       args.runs = n;
     } else {
-      throw new Error(`Unknown argument "${argv[i]}". Usage: npm run eval -w server -- [--case <name>] [--runs N]`);
+      throw new Error(`Unknown argument "${argv[i]}". Usage: npm run eval -w server -- [--case <name>] [--runs N] [--dry-run]`);
     }
   }
   return args;
@@ -109,12 +118,15 @@ interface CaseResult {
   durationMs: number;
   backend: string;
   models: { extractor: string; verifier: string };
+  usage: UsageRecord[];
+  costUsd: number | null;
 }
 
 async function runCaseOnce(caseName: string, caseDir: string, run: number): Promise<CaseResult> {
   const transcript = await loadOrTranscribe(caseName, caseDir);
   const rubric = await loadRubric(caseName, caseDir);
 
+  takeUsage(); // discard anything left over from a failed previous run
   const start = Date.now();
   const extracted = await extractRecipe(transcript);
 
@@ -136,6 +148,7 @@ async function runCaseOnce(caseName: string, caseDir: string, run: number): Prom
 
   const recipe: Recipe = { ...extracted, warnings };
   const score = scoreRecipe(recipe, rubric);
+  const usage = takeUsage();
 
   return {
     case: caseName,
@@ -145,7 +158,35 @@ async function runCaseOnce(caseName: string, caseDir: string, run: number): Prom
     durationMs,
     backend: CLAUDE_BACKEND,
     models: { extractor: EXTRACTOR_MODEL, verifier: VERIFIER_MODEL },
+    usage,
+    costUsd: usage.length > 0 ? costUsd(usage) : null,
   };
+}
+
+function formatCost(usd: number | null): string {
+  return usd === null ? "-" : `$${usd.toFixed(4)}`;
+}
+
+async function dryRun(caseNames: string[]): Promise<void> {
+  const client = new Anthropic();
+  const price = priceFor(EXTRACTOR_MODEL);
+  console.log(`Dry run: extractor input tokens (${EXTRACTOR_MODEL}), counted for free.\n`);
+  for (const caseName of caseNames) {
+    const transcriptPath = path.join(CASES_ROOT, caseName, "transcript.json");
+    if (!existsSync(transcriptPath)) {
+      console.log(`${caseName}: no transcript.json yet (would need transcription first)`);
+      continue;
+    }
+    const transcript = Transcript.parse(JSON.parse(await readFile(transcriptPath, "utf-8")));
+    const { input_tokens } = await client.messages.countTokens({
+      model: EXTRACTOR_MODEL,
+      system: EXTRACTOR_SYSTEM,
+      messages: [{ role: "user", content: formatTranscriptForPrompt(transcript) }],
+    });
+    const inputCost = price ? (input_tokens * price.input) / 1_000_000 : null;
+    console.log(`${caseName.padEnd(44)} ${String(input_tokens).padStart(6)} input tokens  ~${formatCost(inputCost)} input`);
+  }
+  console.log("\nOutput (recipe JSON + thinking) and the verifier call come on top; a real run reports exact totals.");
 }
 
 function resultFileName(caseName: string, run: number, totalRuns: number): string {
@@ -157,13 +198,17 @@ function pct(score: CaseScore): string {
 }
 
 function printTable(results: CaseResult[]): void {
-  const headers = ["case", "run", "score", "passed/total", "duration"];
+  const headers = ["case", "run", "score", "passed/total", "duration", "tokens in/out", "cost"];
   const rows = results.map((r) => [
     r.case,
     String(r.run),
     pct(r.score),
     `${r.score.passed}/${r.score.total}`,
     `${(r.durationMs / 1000).toFixed(1)}s`,
+    r.usage.length > 0
+      ? `${r.usage.reduce((n, u) => n + u.inputTokens, 0)}/${r.usage.reduce((n, u) => n + u.outputTokens, 0)}`
+      : "-",
+    formatCost(r.costUsd),
   ]);
   const widths = headers.map((h, i) => Math.max(h.length, ...rows.map((row) => row[i].length)));
   const fmt = (cells: string[]) => cells.map((c, i) => c.padEnd(widths[i])).join("  ");
@@ -207,11 +252,23 @@ async function main(): Promise<void> {
     caseNames = [args.case];
   }
 
+  if (args.dryRun) {
+    if (CLAUDE_BACKEND !== "api") {
+      console.error("--dry-run needs CLAUDE_BACKEND=api (it uses the API's free token counter).");
+      process.exit(1);
+    }
+    await dryRun(caseNames);
+    return;
+  }
+
   const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
   const resultsDir = path.join(EVAL_ROOT, "results", timestamp);
   await mkdir(resultsDir, { recursive: true });
 
-  console.log(`Running ${caseNames.length} case(s) x ${args.runs} run(s), backend=${CLAUDE_BACKEND}`);
+  console.log(
+    `Running ${caseNames.length} case(s) x ${args.runs} run(s), backend=${CLAUDE_BACKEND}, ` +
+      `extractor=${EXTRACTOR_MODEL}${EXTRACTOR_MODEL.startsWith("claude-haiku-4-5") ? "" : ` (effort ${EXTRACTOR_EFFORT})`}, verifier=${VERIFIER_MODEL}`,
+  );
 
   const results: CaseResult[] = [];
   let anyFailed = false;
@@ -241,7 +298,15 @@ async function main(): Promise<void> {
       await writeFile(
         path.join(resultsDir, fileName),
         JSON.stringify(
-          { recipe: result.recipe, score: result.score, durationMs: result.durationMs, backend: result.backend, models: result.models },
+          {
+            recipe: result.recipe,
+            score: result.score,
+            durationMs: result.durationMs,
+            backend: result.backend,
+            models: result.models,
+            usage: result.usage,
+            costUsd: result.costUsd,
+          },
           null,
           2,
         ),
@@ -259,6 +324,11 @@ async function main(): Promise<void> {
   console.log(
     `\nOverall: ${totalPassed}/${totalChecks} checks passed (${overallPct}%) across ${results.length} run(s).`,
   );
+  const costs = results.map((r) => r.costUsd);
+  if (costs.length > 0 && costs.every((c) => c !== null)) {
+    const total = costs.reduce<number>((a, c) => a + (c ?? 0), 0);
+    console.log(`API cost: ${formatCost(total)} total, ${formatCost(total / costs.length)} per recipe.`);
+  }
 
   const summary = {
     timestamp,
@@ -272,6 +342,7 @@ async function main(): Promise<void> {
       passed: r.score.passed,
       total: r.score.total,
       durationMs: r.durationMs,
+      costUsd: r.costUsd,
       failedChecks: r.score.checks.filter((c) => !c.pass).map((c) => ({ name: c.name, detail: c.detail })),
     })),
     totalPassed,
