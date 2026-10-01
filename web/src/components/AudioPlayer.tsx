@@ -1,6 +1,6 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { Play, Pause, RotateCcw, RotateCw } from "lucide-react";
-import { api } from "@/lib/api";
+import { backend } from "@/backend";
 import { formatTimestamp } from "@/lib/format";
 
 export const AudioPlayer = forwardRef<
@@ -13,6 +13,29 @@ export const AudioPlayer = forwardRef<
   const [playing, setPlaying] = useState(false);
   const [current, setCurrent] = useState(0);
   const [duration, setDuration] = useState(0);
+  const [audioSrc, setAudioSrc] = useState<string | null>(null);
+
+  // Resolve the audio URL (a plain server URL, or an object URL for a stored Blob in
+  // browser mode). Revoke object URLs on change/unmount to avoid leaking memory.
+  useEffect(() => {
+    let cancelled = false;
+    let objectUrl: string | null = null;
+    setAudioSrc(null);
+    backend
+      .getAudioUrl(jobId)
+      .then((url) => {
+        if (cancelled) return;
+        if (url.startsWith("blob:")) objectUrl = url;
+        setAudioSrc(url);
+      })
+      .catch(() => {
+        /* audio not available yet */
+      });
+    return () => {
+      cancelled = true;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [jobId]);
 
   useEffect(() => {
     const el = audioElRef.current;
@@ -63,7 +86,7 @@ export const AudioPlayer = forwardRef<
 
   return (
     <div className="no-print fixed inset-x-0 bottom-3 z-30 px-3">
-      <audio ref={audioElRef} src={api.audioUrl(jobId)} preload="metadata" className="hidden" />
+      <audio ref={audioElRef} src={audioSrc ?? undefined} preload="metadata" className="hidden" />
       <div
         className="mx-auto flex max-w-[720px] items-center gap-2 rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--surface))] py-1.5 pl-1.5 pr-4 sm:gap-3"
         style={{ boxShadow: "var(--shadow-float)" }}

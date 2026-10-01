@@ -1,9 +1,11 @@
 import { useEffect, useState, useCallback } from "react";
 import type { Job } from "@recipe/shared";
-import { api } from "@/lib/api";
+import { backend } from "@/backend";
+import { hasApiKey } from "@/backend/settings";
 import { UploadZone } from "@/components/UploadZone";
 import { StatusBadge } from "@/components/StatusBadge";
-import { jobHref } from "@/lib/router";
+import { jobHref, settingsHref } from "@/lib/router";
+import { routeIfNeedsSetup } from "@/lib/needsSetup";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -20,7 +22,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { MoreHorizontal, Trash2, FileAudio } from "lucide-react";
+import { MoreHorizontal, Trash2, FileAudio, KeyRound } from "lucide-react";
 
 export function Library() {
   const [jobs, setJobs] = useState<Job[] | null>(null);
@@ -28,11 +30,16 @@ export function Library() {
   const [deleteTarget, setDeleteTarget] = useState<Job | null>(null);
   const [deleting, setDeleting] = useState(false);
 
+  const needsSetup = backend.kind === "browser" && !hasApiKey();
+
   const refresh = useCallback(() => {
-    api
+    backend
       .listJobs()
       .then(setJobs)
-      .catch((err: unknown) => setError(err instanceof Error ? err.message : "Failed to load jobs"));
+      .catch((err: unknown) => {
+        if (routeIfNeedsSetup(err)) return;
+        setError(err instanceof Error ? err.message : "Failed to load jobs");
+      });
   }, []);
 
   useEffect(() => {
@@ -43,10 +50,11 @@ export function Library() {
     if (!deleteTarget) return;
     setDeleting(true);
     try {
-      await api.deleteJob(deleteTarget.id);
+      await backend.deleteJob(deleteTarget.id);
       setDeleteTarget(null);
       refresh();
     } catch (err) {
+      if (routeIfNeedsSetup(err)) return;
       setError(err instanceof Error ? err.message : "Failed to delete job");
     } finally {
       setDeleting(false);
@@ -71,7 +79,24 @@ export function Library() {
         </p>
       </div>
 
-      <UploadZone onUploaded={refresh} />
+      {needsSetup ? (
+        <a
+          href={settingsHref()}
+          className="flex items-center gap-3 rounded-[10px] border border-dashed border-[hsl(var(--border-strong))] bg-[hsl(var(--surface))] px-5 py-5 transition-colors hover:border-[hsl(var(--accent-fill))]/60"
+        >
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[hsl(var(--accent-tint))] text-[hsl(var(--accent-text))]">
+            <KeyRound className="h-4 w-4" />
+          </span>
+          <span className="text-sm">
+            <span className="font-medium text-[hsl(var(--ink))]">
+              Add your Anthropic API key to start
+            </span>
+            <span className="text-[hsl(var(--ink-faint))]"> — it stays in this browser. Go to Settings.</span>
+          </span>
+        </a>
+      ) : (
+        <UploadZone onUploaded={refresh} />
+      )}
 
       {error && (
         <p role="alert" className="text-sm text-[hsl(var(--danger))]">

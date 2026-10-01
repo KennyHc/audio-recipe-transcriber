@@ -3,7 +3,9 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import { useRoute } from "@/lib/router";
 import { Library } from "@/pages/Library";
 import { JobPage } from "@/pages/JobPage";
-import { AudioLines } from "lucide-react";
+import { Settings } from "@/pages/Settings";
+import { backend } from "@/backend";
+import { AudioLines, Settings as SettingsIcon } from "lucide-react";
 
 export default function App() {
   const route = useRoute();
@@ -21,11 +23,27 @@ export default function App() {
                 Recipe Transcriber
               </span>
             </a>
-            <ThemeToggle />
+            <div className="flex items-center gap-1">
+              <span className="hidden sm:inline text-xs text-[hsl(var(--ink-faint))] mr-1">
+                {backend.kind === "browser" ? "Runs in your browser" : "Local server"}
+              </span>
+              {backend.kind === "browser" && (
+                <a
+                  href="#/settings"
+                  aria-label="Settings"
+                  className="inline-flex h-9 w-9 items-center justify-center rounded-[8px] text-[hsl(var(--ink-muted))] transition-colors hover:bg-[hsl(var(--accent-tint))] hover:text-[hsl(var(--ink))]"
+                >
+                  <SettingsIcon className="h-4 w-4" />
+                </a>
+              )}
+              <ThemeToggle />
+            </div>
           </div>
         </header>
         <main className="flex-1">
-          {route.name === "library" ? (
+          {route.name === "settings" ? (
+            <Settings />
+          ) : route.name === "library" ? (
             <Library />
           ) : (
             <JobPage jobId={route.id} cookRoute={route.cook} />

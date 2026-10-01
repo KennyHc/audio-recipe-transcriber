@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { RecipeVersionMeta, VersionSource } from "@recipe/shared";
-import { api } from "@/lib/api";
+import { backend } from "@/backend";
 import {
   Dialog,
   DialogContent,
@@ -42,7 +42,7 @@ export function VersionHistory({
   useEffect(() => {
     if (!open) return;
     setError(null);
-    api
+    backend
       .listVersions(jobId)
       .then(setVersions)
       .catch((err: unknown) => setError(err instanceof Error ? err.message : "Failed to load versions"));
@@ -51,7 +51,7 @@ export function VersionHistory({
   async function restore(version: number) {
     setRestoring(version);
     try {
-      await api.rollback(jobId, version);
+      await backend.rollback(jobId, version);
       onRestored();
       onOpenChange(false);
     } catch (err) {

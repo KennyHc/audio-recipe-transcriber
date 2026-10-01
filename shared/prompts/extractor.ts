@@ -1,4 +1,4 @@
-import type { Transcript } from "@recipe/shared";
+import type { Transcript } from "../recipe";
 
 export const EXTRACTOR_SYSTEM = `You turn a raw, spoken-word transcript of a cooking video into a structured recipe.
 

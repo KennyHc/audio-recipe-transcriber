@@ -23,7 +23,7 @@ audio ─► ffmpeg (16 kHz mono wav) ─► whisper-cli (local) ─► Transcri
 - Structured outputs: `client.messages.parse({ ..., output_config: { format: zodOutputFormat(Schema) } })` from `@anthropic-ai/sdk/helpers/zod`; guard `parsed_output` being null and check `stop_reason` (`refusal`, `max_tokens`).
 - Models come from env (`EXTRACTOR_MODEL`, `VERIFIER_MODEL`); never hardcode elsewhere.
 - LLM-facing Zod schemas use `.nullable()`, not `.optional()`.
-- Prompts live in `server/src/prompts/*.ts` as exported constants so they can be tuned without touching logic.
+- Prompts live in `shared/prompts/*.ts` (used by both the server and the in-browser pipeline) so they can be tuned without touching logic.
 - The extractor must never invent quantities. Anything not traceable to the transcript is `confidence: "inferred"`.
 
 ## Commands

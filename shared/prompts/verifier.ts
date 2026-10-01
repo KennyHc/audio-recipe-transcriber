@@ -1,10 +1,6 @@
-import type { ExtractedRecipe, Transcript } from "@recipe/shared";
-import { formatTranscriptForPrompt } from "./extractor.ts";
+import type { ExtractedRecipe, Transcript } from "../recipe";
+import { formatTranscriptForPrompt } from "./extractor";
 
-// Re-exported so callers can import both the formatter and the verifier
-// prompt from this module; the implementation lives in extractor.ts so the
-// transcript-formatting logic has exactly one definition.
-export { formatTranscriptForPrompt };
 
 export const VERIFIER_SYSTEM = `You check a structured recipe against the transcript it was extracted from and
 report anything that looks wrong. You do not fix the recipe — you only flag

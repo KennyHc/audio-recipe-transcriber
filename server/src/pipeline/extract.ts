@@ -4,7 +4,7 @@ import { ExtractedRecipe, type Transcript } from "@recipe/shared";
 import { CLAUDE_BACKEND, EXTRACTOR_EFFORT, EXTRACTOR_MODEL } from "../config.ts";
 import { callClaudeCli } from "../llm/claudeCli.ts";
 import { recordUsage } from "../llm/usage.ts";
-import { EXTRACTOR_SYSTEM, formatTranscriptForPrompt } from "../prompts/extractor.ts";
+import { EXTRACTOR_SYSTEM, formatTranscriptForPrompt } from "@recipe/shared";
 
 // Created lazily: in "cli" mode there may be no API key at all.
 let client: Anthropic | undefined;

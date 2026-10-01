@@ -1,12 +1,18 @@
 import { useEffect, useState } from "react";
 
-export type Route = { name: "library" } | { name: "job"; id: string; cook: boolean };
+export type Route =
+  | { name: "library" }
+  | { name: "job"; id: string; cook: boolean }
+  | { name: "settings" };
 
 function parseHash(hash: string): Route {
   const clean = hash.replace(/^#\/?/, "");
   const parts = clean.split("/").filter(Boolean);
   if (parts[0] === "jobs" && parts[1]) {
     return { name: "job", id: decodeURIComponent(parts[1]), cook: parts[2] === "cook" };
+  }
+  if (parts[0] === "settings") {
+    return { name: "settings" };
   }
   return { name: "library" };
 }
@@ -33,4 +39,8 @@ export function jobHref(id: string) {
 
 export function cookHref(id: string) {
   return `#/jobs/${encodeURIComponent(id)}/cook`;
+}
+
+export function settingsHref() {
+  return "#/settings";
 }

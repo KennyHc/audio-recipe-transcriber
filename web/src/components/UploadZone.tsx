@@ -1,8 +1,9 @@
 import { useRef, useState } from "react";
 import { UploadCloud, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { api } from "@/lib/api";
+import { backend } from "@/backend";
 import { navigate, jobHref } from "@/lib/router";
+import { routeIfNeedsSetup } from "@/lib/needsSetup";
 
 const ACCEPTED_EXTENSIONS = [".mp3", ".m4a", ".wav", ".webm", ".ogg", ".mp4", ".aac", ".flac"];
 
@@ -26,7 +27,7 @@ export function UploadZone({ onUploaded }: { onUploaded: () => void }) {
     }
     setError(null);
     setProgress(0);
-    const { promise } = api.uploadAudio(file, (fraction) => setProgress(fraction));
+    const { promise } = backend.uploadAudio(file, (fraction) => setProgress(fraction));
     promise
       .then((job) => {
         setProgress(null);
@@ -35,6 +36,7 @@ export function UploadZone({ onUploaded }: { onUploaded: () => void }) {
       })
       .catch((err: unknown) => {
         setProgress(null);
+        if (routeIfNeedsSetup(err)) return;
         setError(err instanceof Error ? err.message : "Upload failed");
       });
   }

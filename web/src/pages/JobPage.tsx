@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Job, Recipe, RecipeVersionMeta, Transcript, VersionedRecipe } from "@recipe/shared";
 import { TERMINAL_STATUSES } from "@recipe/shared";
-import { api } from "@/lib/api";
+import { backend, type JobProgress } from "@/backend";
 import { navigate, jobHref, cookHref } from "@/lib/router";
+import { routeIfNeedsSetup } from "@/lib/needsSetup";
 import { Stepper } from "@/components/Stepper";
 import { RecipeView } from "@/components/RecipeView";
 import { EditRecipe } from "@/components/EditRecipe";
@@ -13,6 +14,10 @@ import { ServingsScaler } from "@/components/ServingsScaler";
 import { UnitsToggle } from "@/components/UnitsToggle";
 import { CookMode, type CookModeHandle } from "@/components/cook/CookMode";
 import { decideCookRouteAction } from "@/lib/cook";
+import { ModelDownloadDialog } from "@/components/ModelDownloadDialog";
+import { findSpeechModelOption, DEFAULT_SPEECH_MODEL, type SpeechModelOption } from "@/backend/browser/modelCatalog";
+import { getBrowserSettings, saveBrowserSettings } from "@/backend/settings";
+import { useWakeLock } from "@/lib/processingHealth";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
@@ -162,9 +167,30 @@ export function JobPage({ jobId, cookRoute }: { jobId: string; cookRoute: boolea
   const [currentTime, setCurrentTime] = useState<number | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [pollKey, setPollKey] = useState(0);
+  const [progress, setProgress] = useState<JobProgress | null>(null);
+
+  const [modelDialogOpen, setModelDialogOpen] = useState(false);
+  const autoPromptedRef = useRef(false);
+
+  // Keep the screen awake, and show a quiet "keep this tab in front" tip, while the browser
+  // backend is actually doing work (downloading the model or running inference) — not while
+  // merely queued/waiting for model-download consent, where nothing is happening yet.
+  const isProcessing = job?.status === "transcribing" || job?.status === "extracting" || job?.status === "verifying";
+  useWakeLock(isProcessing);
+
+  // The first time this job is seen waiting for model-download consent, open the dialog
+  // automatically. If the visitor cancels, autoPromptedRef stays true so we don't re-open it
+  // on every subsequent 1s poll tick — they see the "Waiting for speech model — Download"
+  // button instead, and can reopen the dialog from there.
+  useEffect(() => {
+    if (progress?.awaitingModelConsent && !autoPromptedRef.current) {
+      autoPromptedRef.current = true;
+      setModelDialogOpen(true);
+    }
+  }, [progress?.awaitingModelConsent]);
 
   const loadRecipe = useCallback(() => {
-    api
+    backend
       .getRecipe(jobId)
       .then(setLatest)
       .catch(() => {
@@ -173,7 +199,7 @@ export function JobPage({ jobId, cookRoute }: { jobId: string; cookRoute: boolea
   }, [jobId]);
 
   const loadTranscript = useCallback(() => {
-    api
+    backend
       .getTranscript(jobId)
       .then(setTranscript)
       .catch(() => {
@@ -199,13 +225,16 @@ export function JobPage({ jobId, cookRoute }: { jobId: string; cookRoute: boolea
     openedCookViaPushRef.current = false;
     interceptedBackRef.current = false;
     cookHasActiveTimersRef.current = false;
+    autoPromptedRef.current = false;
+    setModelDialogOpen(false);
 
     async function tick() {
       try {
-        const j = await api.getJob(jobId);
+        const j = await backend.getJob(jobId);
         if (cancelled) return;
         setJob(j);
         setLoadError(null);
+        setProgress(TERMINAL_STATUSES.includes(j.status) ? null : backend.getProgress(jobId));
 
         if (!transcriptFetchedRef.current && j.status !== "queued" && j.status !== "transcribing") {
           transcriptFetchedRef.current = true;
@@ -219,7 +248,9 @@ export function JobPage({ jobId, cookRoute }: { jobId: string; cookRoute: boolea
           interval = null;
         }
       } catch (err) {
-        if (!cancelled) setLoadError(err instanceof Error ? err.message : "Failed to load job");
+        if (cancelled) return;
+        if (routeIfNeedsSetup(err)) return;
+        setLoadError(err instanceof Error ? err.message : "Failed to load job");
       }
     }
 
@@ -235,7 +266,7 @@ export function JobPage({ jobId, cookRoute }: { jobId: string; cookRoute: boolea
   // Fetch a specific historical version when the user chooses to preview one.
   useEffect(() => {
     if (viewingVersion === null) return;
-    api
+    backend
       .getVersion(jobId, viewingVersion)
       .then((vr) => {
         setViewingRecipe(vr.recipe);
@@ -266,11 +297,12 @@ export function JobPage({ jobId, cookRoute }: { jobId: string; cookRoute: boolea
     setSaving(true);
     setSaveError(null);
     try {
-      const vr = await api.putRecipe(jobId, recipe);
+      const vr = await backend.putRecipe(jobId, recipe);
       setLatest(vr);
       setViewingVersion(null);
       setEditing(false);
     } catch (err) {
+      if (routeIfNeedsSetup(err)) return;
       setSaveError(err instanceof Error ? err.message : "Failed to save recipe");
     } finally {
       setSaving(false);
@@ -280,12 +312,13 @@ export function JobPage({ jobId, cookRoute }: { jobId: string; cookRoute: boolea
   async function handleReextract() {
     setReextracting(true);
     try {
-      const j = await api.reextract(jobId);
+      const j = await backend.reextract(jobId);
       setJob(j);
       setViewingVersion(null);
       setReextractConfirmOpen(false);
       setPollKey((k) => k + 1);
     } catch (err) {
+      if (routeIfNeedsSetup(err)) return;
       setSaveError(err instanceof Error ? err.message : "Failed to re-extract");
     } finally {
       setReextracting(false);
@@ -296,15 +329,33 @@ export function JobPage({ jobId, cookRoute }: { jobId: string; cookRoute: boolea
     setRetrying(true);
     setRetryError(null);
     try {
-      const j = await api.retry(jobId);
+      const j = await backend.retry(jobId);
       setJob(j);
       setViewingVersion(null);
       setPollKey((k) => k + 1);
     } catch (err) {
+      if (routeIfNeedsSetup(err)) return;
       setRetryError(err instanceof Error ? err.message : "Failed to retry");
     } finally {
       setRetrying(false);
     }
+  }
+
+  async function handleModelDownload(option: SpeechModelOption) {
+    saveBrowserSettings({ ...getBrowserSettings(), whisperModel: option.repoId, whisperDtype: option.dtype });
+    try {
+      const j = await backend.resumeAfterModelConsent(jobId);
+      setJob(j);
+      setPollKey((k) => k + 1);
+    } catch (err) {
+      if (routeIfNeedsSetup(err)) return;
+      setRetryError(err instanceof Error ? err.message : "Failed to start the download");
+    }
+  }
+
+  function handleModelCancel() {
+    // No-op: the job stays paused (see progress.awaitingModelConsent) with a visible
+    // "Waiting for speech model — Download" button rather than erroring.
   }
 
   function handleCopyMarkdown() {
@@ -376,9 +427,46 @@ export function JobPage({ jobId, cookRoute }: { jobId: string; cookRoute: boolea
             {job.title ?? job.fileName}
           </p>
           <Stepper status={job.status} />
-          <p className="text-sm text-[hsl(var(--ink-muted))]">This usually takes 1–3 minutes.</p>
+          {progress?.awaitingModelConsent ? (
+            <div className="space-y-2">
+              <p className="text-sm text-[hsl(var(--ink-muted))]">{progress.label}</p>
+              <Button size="sm" onClick={() => setModelDialogOpen(true)}>
+                Download
+              </Button>
+            </div>
+          ) : progress ? (
+            <div className="space-y-1.5">
+              {/* progress.label already includes the percentage-equivalent detail (byte
+                  counts, rate, ETA) for the download stage — see lib/downloadProgress.ts —
+                  so it's shown as-is, without an extra "— NN%" appended. */}
+              <p className="text-sm text-[hsl(var(--ink-muted))]">{progress.label}</p>
+              {progress.fraction !== null && (
+                <div className="h-1 w-full max-w-sm rounded-full bg-[hsl(var(--sunken))] overflow-hidden">
+                  <div
+                    className="h-full bg-[hsl(var(--accent-fill))] transition-[width]"
+                    style={{ width: `${Math.round(progress.fraction * 100)}%` }}
+                  />
+                </div>
+              )}
+            </div>
+          ) : (
+            <p className="text-sm text-[hsl(var(--ink-muted))]">This usually takes 1–3 minutes.</p>
+          )}
+          {isProcessing && (
+            <p className="text-xs text-[hsl(var(--ink-faint))]">
+              Keep this tab open and in front — background tabs process more slowly.
+            </p>
+          )}
         </div>
       )}
+
+      <ModelDownloadDialog
+        open={modelDialogOpen}
+        onOpenChange={setModelDialogOpen}
+        defaultOption={findSpeechModelOption(getBrowserSettings().whisperModel, getBrowserSettings().whisperDtype) ?? DEFAULT_SPEECH_MODEL}
+        onDownload={handleModelDownload}
+        onCancel={handleModelCancel}
+      />
 
       {job.status === "error" && (
         <div className="rounded-[10px] border border-[hsl(var(--danger))]/30 bg-[hsl(var(--danger))]/10 p-4 space-y-3">

@@ -19,7 +19,7 @@ import { Recipe, Transcript, type RecipeWarning } from "@recipe/shared";
 import Anthropic from "@anthropic-ai/sdk";
 import { CLAUDE_BACKEND, EXTRACTOR_EFFORT, EXTRACTOR_MODEL, VERIFIER_MODEL } from "../config.ts";
 import { costUsd, priceFor, takeUsage, type UsageRecord } from "../llm/usage.ts";
-import { EXTRACTOR_SYSTEM, formatTranscriptForPrompt } from "../prompts/extractor.ts";
+import { EXTRACTOR_SYSTEM, formatTranscriptForPrompt } from "@recipe/shared";
 import { REPO_ROOT } from "../storage.ts";
 import { extractRecipe, ExtractionError } from "../pipeline/extract.ts";
 import { verifyRecipe, VerificationError } from "../pipeline/verify.ts";
