@@ -14,7 +14,9 @@
     "typecheck": "npm run typecheck -w server && npm run typecheck -w web && npm run typecheck -w worker",
     "test": "npm run test -w server && npm run test -w web && npm run test -w worker",
     "setup:whisper": "bash scripts/setup-whisper.sh",
-    "eval": "npm run eval -w server --"
+    "eval": "npm run eval -w server --",
+    "deploy:pages": "bash scripts/deploy-pages.sh",
+    "deploy:worker": "npm run deploy -w worker"
   },
   "devDependencies": {
     "concurrently": "^9.0.0",
