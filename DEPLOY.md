@@ -1,6 +1,6 @@
 # Deploying the hosted app (Cloudflare)
 
-The hosted app is a static site on **Cloudflare Pages** plus a small API on **Cloudflare
+The hosted app is a static site on **Cloudflare Workers static assets** (Pages is now part of Workers) plus a small API on **Cloudflare
 Workers**. Speech-to-text runs on each visitor's device; only the transcript goes to the
 Worker, which adds the operator's Anthropic key and calls Claude.
 
@@ -30,7 +30,7 @@ npm run preview:hosted -w web                  # app on http://localhost:5183
 
 1. Create a free Cloudflare account.
 2. `cd worker && npx wrangler login`
-3. Cloudflare dashboard → **Turnstile** → Add widget. Hostname: `recipe-transcriber.pages.dev`
+3. Cloudflare dashboard → **Turnstile** → Add widget. Hostname: `recipe-transcriber.kennyjiaxi.workers.dev` (the site's workers.dev address)
    (plus your custom domain if you add one). Note the **site key** (public) and **secret key**.
 4. Set the Worker secrets — each command prompts for the value, which goes straight to
    Cloudflare:
@@ -46,7 +46,7 @@ npm run preview:hosted -w web                  # app on http://localhost:5183
 ## 2. Deploy
 
 1. Add the production origin to `ALLOWED_ORIGINS` in `worker/wrangler.toml`
-   (e.g. `https://recipe-transcriber.pages.dev`), then deploy the Worker:
+   (e.g. `https://recipe-transcriber.kennyjiaxi.workers.dev`), then deploy the Worker:
    ```bash
    npm run deploy:worker        # prints https://recipe-transcriber-api.<subdomain>.workers.dev
    ```
@@ -54,7 +54,7 @@ npm run preview:hosted -w web                  # app on http://localhost:5183
    ```bash
    VITE_API_BASE=https://recipe-transcriber-api.<subdomain>.workers.dev \
    VITE_TURNSTILE_SITE_KEY=<site key> \
-   npm run deploy:pages
+   npm run deploy:site
    ```
    The script refuses non-https API URLs and Turnstile test keys.
 

@@ -15,8 +15,8 @@
     "test": "npm run test -w server && npm run test -w web && npm run test -w worker",
     "setup:whisper": "bash scripts/setup-whisper.sh",
     "eval": "npm run eval -w server --",
-    "deploy:pages": "bash scripts/deploy-pages.sh",
-    "deploy:worker": "npm run deploy -w worker"
+    "deploy:worker": "npm run deploy -w worker",
+    "deploy:site": "bash scripts/deploy-site.sh"
   },
   "devDependencies": {
     "concurrently": "^9.0.0",
