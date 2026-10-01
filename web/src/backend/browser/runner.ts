@@ -7,7 +7,7 @@
 import type { JobStatus, Recipe, Transcript, VersionSource } from "@recipe/shared";
 import type { JobProgress } from "../types";
 import * as db from "./db";
-import { extractRecipe, ExtractionError, verifyRecipe, VerificationError } from "./claude";
+import { extractRecipe, ExtractionError, verifyRecipe, VerificationError } from "./claudeProvider";
 import { transcribeAudio } from "./transcribe";
 import { reloadSettings } from "./settings";
 import { isModelCached } from "./modelCatalog";

@@ -19,3 +19,13 @@ eval/results/
 *.ogg
 *.aac
 *.flac
+
+# Cloudflare Worker local secrets (never commit)
+.dev.vars
+.dev.vars.*
+.wrangler/
+
+# Local env files (keep only the committed examples)
+.env.*
+!.env.example
+!.env.*.example

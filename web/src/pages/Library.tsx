@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from "react";
 import type { Job } from "@recipe/shared";
 import { backend } from "@/backend";
 import { hasApiKey } from "@/backend/settings";
+import { IS_HOSTED } from "@/lib/mode";
 import { UploadZone } from "@/components/UploadZone";
 import { StatusBadge } from "@/components/StatusBadge";
 import { jobHref, settingsHref } from "@/lib/router";
@@ -30,7 +31,8 @@ export function Library() {
   const [deleteTarget, setDeleteTarget] = useState<Job | null>(null);
   const [deleting, setDeleting] = useState(false);
 
-  const needsSetup = backend.kind === "browser" && !hasApiKey();
+  // Hosted mode never needs a key — Claude calls go through the operator's Worker.
+  const needsSetup = backend.kind === "browser" && !IS_HOSTED && !hasApiKey();
 
   const refresh = useCallback(() => {
     backend

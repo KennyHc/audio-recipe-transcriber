@@ -1,0 +1,33 @@
+name = "recipe-transcriber-api"
+main = "src/index.ts"
+compatibility_date = "2026-10-01"
+# No nodejs_compat flag: verified via `wrangler deploy --dry-run` that the
+# bundled output contains no `node:*` imports (the Anthropic SDK's package.json
+# "browser" field remaps its node-specific internals away when bundled this
+# way), so the Worker doesn't need Node.js API polyfills at runtime.
+
+# Secrets (set with `npx wrangler secret put <NAME>`, never written here):
+#   ANTHROPIC_API_KEY  - Claude API key used server-side only
+#   TURNSTILE_SECRET   - Cloudflare Turnstile secret key
+#   VISITOR_SALT       - random string mixed into the per-visitor hash so raw
+#                        IPs are never stored (see src/visitorId.ts)
+
+[vars]
+# Comma-separated list of origins allowed to call this API.
+ALLOWED_ORIGINS = "http://localhost:5182,http://localhost:5183"
+PER_VISITOR_DAILY_LIMIT = "20"
+DAILY_BUDGET_USD = "0.5"
+EXTRACTOR_MODEL = "claude-haiku-4-5"
+VERIFIER_MODEL = "claude-haiku-4-5"
+
+# A single Durable Object instance (id "global") tracks per-visitor and
+# global-spend counters for the current UTC day. Free plan: Durable Objects
+# must use SQLite-backed storage, enabled via the `new_sqlite_classes`
+# migration below (not the legacy KV-backed `new_classes`).
+[[durable_objects.bindings]]
+name = "LIMITER"
+class_name = "LimiterDO"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["LimiterDO"]

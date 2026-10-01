@@ -6,11 +6,14 @@
   "scripts": {
     "dev": "vite",
     "dev:browser": "VITE_BACKEND=browser vite",
+    "dev:hosted": "VITE_BACKEND=hosted vite --mode hosted",
     "build": "tsc --noEmit && vite build",
     "build:browser": "VITE_BACKEND=browser tsc --noEmit && VITE_BACKEND=browser vite build",
+    "build:hosted": "VITE_BACKEND=hosted tsc --noEmit && VITE_BACKEND=hosted vite build --mode hosted && node scripts/check-no-secrets.mjs --hosted",
     "typecheck": "tsc --noEmit",
     "preview": "vite preview",
     "preview:browser": "npm run build:browser && vite preview --port 5182 --strictPort",
+    "preview:hosted": "npm run build:hosted && vite preview --port 5183 --strictPort",
     "test": "vitest run"
   },
   "devDependencies": {

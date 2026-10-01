@@ -13,7 +13,9 @@ import { createServerBackend } from "./server";
 // import to resolve in browser mode; that's a one-time, same-tick cost since the import
 // itself is local code (no network round trip beyond the browser backend's own chunk).
 async function resolveBackend(): Promise<Backend> {
-  if (import.meta.env.VITE_BACKEND === "browser") {
+  // "hosted" shares the same in-browser backend as "browser" (IndexedDB storage, in-page
+  // Whisper pipeline) — only its Claude calls differ, swapped inside browser/claudeProvider.ts.
+  if (import.meta.env.VITE_BACKEND === "browser" || import.meta.env.VITE_BACKEND === "hosted") {
     const { createBrowserBackend } = await import("./browser");
     return createBrowserBackend();
   }

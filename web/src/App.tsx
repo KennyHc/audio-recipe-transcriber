@@ -5,6 +5,7 @@ import { Library } from "@/pages/Library";
 import { JobPage } from "@/pages/JobPage";
 import { Settings } from "@/pages/Settings";
 import { backend } from "@/backend";
+import { IS_HOSTED } from "@/lib/mode";
 import { AudioLines, Settings as SettingsIcon } from "lucide-react";
 
 export default function App() {
@@ -25,7 +26,7 @@ export default function App() {
             </a>
             <div className="flex items-center gap-1">
               <span className="hidden sm:inline text-xs text-[hsl(var(--ink-faint))] mr-1">
-                {backend.kind === "browser" ? "Runs in your browser" : "Local server"}
+                {IS_HOSTED ? "Free · runs in your browser" : backend.kind === "browser" ? "Runs in your browser" : "Local server"}
               </span>
               {backend.kind === "browser" && (
                 <a
