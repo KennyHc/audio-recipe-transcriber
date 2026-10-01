@@ -35,7 +35,8 @@ describe("describeTranscriptionError", () => {
     expect(describeTranscriptionError("The transcription worker crashed.")).toBe("The transcription worker crashed.");
   });
 
-  it("the interrupted message only claims files are kept, matching whole-file cache granularity", () => {
-    expect(MODEL_DOWNLOAD_INTERRUPTED_MESSAGE).toMatch(/files that finished downloading are kept/);
+  it("doesn't claim a specific cause, and says progress is kept (chunks persist)", () => {
+    expect(MODEL_DOWNLOAD_INTERRUPTED_MESSAGE).not.toMatch(/connection lost/i);
+    expect(MODEL_DOWNLOAD_INTERRUPTED_MESSAGE).toMatch(/progress so far is kept/);
   });
 });

@@ -28,7 +28,9 @@ export function isNetworkFailureMessage(message: string): boolean {
  * in flight when the connection dropped is not cached, but any earlier file that finished is.
  */
 export const MODEL_DOWNLOAD_INTERRUPTED_MESSAGE =
-  "The speech model download was interrupted (connection lost). Press Retry — files that finished downloading are kept.";
+  // A dropped connection and a blocked request (CORS, firewall, extension) look identical to
+  // fetch ("Failed to fetch"), so don't claim to know which one happened.
+  "Couldn't download the speech model. Check your internet connection (or a VPN, firewall, or browser extension that might block the download), then press Retry — progress so far is kept.";
 
 /** Rewrites a raw error message from the transcription path into a clear one when it matches
  * a known network-failure signature; other errors are returned unchanged. */

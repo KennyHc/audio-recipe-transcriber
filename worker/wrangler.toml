@@ -16,7 +16,7 @@ preview_urls = false
 
 [vars]
 # Comma-separated list of origins allowed to call this API.
-ALLOWED_ORIGINS = "https://recipe-transcriber.kennyjiaxi.workers.dev,http://localhost:5182,http://localhost:5183"
+ALLOWED_ORIGINS = "https://recipe-transcriber.pages.dev,http://localhost:5182,http://localhost:5183"
 PER_VISITOR_DAILY_LIMIT = "20"
 DAILY_BUDGET_USD = "0.5"
 EXTRACTOR_MODEL = "claude-haiku-4-5"

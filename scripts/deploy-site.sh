@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
-# Builds the hosted web app and publishes it as a static-assets Worker (web/wrangler.toml).
+# Builds the hosted web app and publishes it to Cloudflare Pages (recipe-transcriber.pages.dev).
+# Pages, not a workers.dev static-assets Worker: Hugging Face rejects model downloads whose
+# Referer is any *.workers.dev site (see LAUNCH-NOTES.md).
 #
 #   VITE_API_BASE=https://recipe-transcriber-api.<you>.workers.dev \
 #   VITE_TURNSTILE_SITE_KEY=<your public Turnstile site key> \
@@ -30,4 +32,4 @@ npm run build:hosted -w web
 rm -f web/dist/assets/ort-wasm-*.wasm
 oversized=$(find web/dist -type f -size +25M)
 if [[ -n "$oversized" ]]; then echo "Files over the 25 MiB asset limit: $oversized" >&2; exit 1; fi
-cd web && ../node_modules/.bin/wrangler deploy
+node_modules/.bin/wrangler pages deploy web/dist --project-name recipe-transcriber --branch main --commit-dirty=true
