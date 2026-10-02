@@ -6,7 +6,8 @@ import { JobPage } from "@/pages/JobPage";
 import { Settings } from "@/pages/Settings";
 import { backend } from "@/backend";
 import { IS_HOSTED } from "@/lib/mode";
-import { AudioLines, Settings as SettingsIcon } from "lucide-react";
+import { Settings as SettingsIcon } from "lucide-react";
+import { NoodlesLogo } from "@/components/NoodlesLogo";
 
 export default function App() {
   const route = useRoute();
@@ -17,8 +18,8 @@ export default function App() {
         <header className="no-print border-b border-[hsl(var(--border))] bg-[hsl(var(--surface))]">
           <div className="mx-auto max-w-[1120px] px-4 py-2.5 flex items-center justify-between gap-2">
             <a href="#/" className="flex items-center gap-2.5 group">
-              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-[8px] bg-[hsl(var(--accent-tint))] text-[hsl(var(--accent-text))]">
-                <AudioLines className="h-4 w-4" />
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[9px] bg-[hsl(var(--accent-tint))] text-[hsl(var(--accent-text))]">
+                <NoodlesLogo className="h-[21px] w-[21px]" />
               </span>
               <span className="font-semibold text-[15px] tracking-tight text-[hsl(var(--ink))] group-hover:text-[hsl(var(--accent-text))] transition-colors">
                 Recipe Transcriber
