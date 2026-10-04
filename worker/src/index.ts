@@ -102,10 +102,10 @@ async function handleExtract(env: Env, request: Request): Promise<ExtractRespons
 
   try {
     const { recipe, usage } = await extractRecipe(env.ANTHROPIC_API_KEY, env.EXTRACTOR_MODEL, transcript);
-    await settleReservation(stub, reserved, actualCostUsd(env.EXTRACTOR_MODEL, usage));
+    await settleReservation(stub, reserved, actualCostUsd(env.EXTRACTOR_MODEL, usage), utcDateString(now));
     return { recipe };
   } catch (err) {
-    await releaseReservation(stub, reserved);
+    await releaseReservation(stub, reserved, utcDateString(now));
     throw err;
   }
 }
@@ -123,10 +123,10 @@ async function handleVerify(env: Env, request: Request): Promise<VerifyResponse>
 
   try {
     const { warnings, usage } = await verifyRecipe(env.ANTHROPIC_API_KEY, env.VERIFIER_MODEL, transcript, recipe);
-    await settleReservation(stub, reserved, actualCostUsd(env.VERIFIER_MODEL, usage));
+    await settleReservation(stub, reserved, actualCostUsd(env.VERIFIER_MODEL, usage), utcDateString(now));
     return { warnings };
   } catch (err) {
-    await releaseReservation(stub, reserved);
+    await releaseReservation(stub, reserved, utcDateString(now));
     throw err;
   }
 }

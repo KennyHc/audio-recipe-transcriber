@@ -3,8 +3,10 @@
 export type LimiterRequest =
   | { action: "incrementVisitor"; visitorId: string; limit: number; nowMs: number }
   | { action: "reserve"; amountUsd: number; budgetUsd: number; nowMs: number }
-  | { action: "release"; amountUsd: number }
-  | { action: "settle"; reservedAmountUsd: number; actualAmountUsd: number };
+  // `day` is the UTC date the reservation was made on: release/settle must hit that day's
+  // counter, not "today", or a call that crosses midnight would corrupt the new day's budget.
+  | { action: "release"; amountUsd: number; day: string }
+  | { action: "settle"; reservedAmountUsd: number; actualAmountUsd: number; day: string };
 
 export type LimiterResponse = { ok: true } | { ok: false; retryAfterSeconds: number };
 

@@ -35,14 +35,15 @@ export async function reserveOrThrow(
   if (!result.ok) throw appError("budget_exhausted", result.retryAfterSeconds);
 }
 
-export async function releaseReservation(stub: DurableObjectStub, amountUsd: number): Promise<void> {
-  await call(stub, { action: "release", amountUsd });
+export async function releaseReservation(stub: DurableObjectStub, amountUsd: number, day: string): Promise<void> {
+  await call(stub, { action: "release", amountUsd, day });
 }
 
 export async function settleReservation(
   stub: DurableObjectStub,
   reservedAmountUsd: number,
   actualAmountUsd: number,
+  day: string,
 ): Promise<void> {
-  await call(stub, { action: "settle", reservedAmountUsd, actualAmountUsd });
+  await call(stub, { action: "settle", reservedAmountUsd, actualAmountUsd, day });
 }

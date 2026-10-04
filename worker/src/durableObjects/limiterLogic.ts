@@ -61,20 +61,18 @@ export async function applyLimiterRequest(
     }
 
     case "release": {
-      const today = utcDateString(new Date());
-      const key = budgetKey(today);
+      const key = budgetKey(request.day);
       const current = await storage.get<BudgetDayState>(key);
-      await storage.put(key, release(current, today, request.amountUsd));
+      await storage.put(key, release(current, request.day, request.amountUsd));
       return { ok: true };
     }
 
     case "settle": {
-      const today = utcDateString(new Date());
-      const key = budgetKey(today);
+      const key = budgetKey(request.day);
       const current = await storage.get<BudgetDayState>(key);
       await storage.put(
         key,
-        settle(current, today, request.reservedAmountUsd, request.actualAmountUsd),
+        settle(current, request.day, request.reservedAmountUsd, request.actualAmountUsd),
       );
       return { ok: true };
     }

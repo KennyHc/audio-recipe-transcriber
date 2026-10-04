@@ -73,7 +73,7 @@ describe("applyLimiterRequest: reserve/release/settle", () => {
   it("release frees budget back up for a later reservation", async () => {
     const storage = fakeStorage();
     await applyLimiterRequest(storage, { action: "reserve", amountUsd: 0.4, budgetUsd: 0.5, nowMs: NOW_MS });
-    await applyLimiterRequest(storage, { action: "release", amountUsd: 0.4 });
+    await applyLimiterRequest(storage, { action: "release", amountUsd: 0.4, day: "2026-10-01" });
     const after = await applyLimiterRequest(storage, {
       action: "reserve",
       amountUsd: 0.4,
@@ -86,7 +86,7 @@ describe("applyLimiterRequest: reserve/release/settle", () => {
   it("settle moves the reservation into settled spend", async () => {
     const storage = fakeStorage();
     await applyLimiterRequest(storage, { action: "reserve", amountUsd: 0.4, budgetUsd: 0.5, nowMs: NOW_MS });
-    await applyLimiterRequest(storage, { action: "settle", reservedAmountUsd: 0.4, actualAmountUsd: 0.1 });
+    await applyLimiterRequest(storage, { action: "settle", reservedAmountUsd: 0.4, actualAmountUsd: 0.1, day: "2026-10-01" });
     // 0.1 settled + a new 0.4 reservation = 0.5, right at budget.
     const after = await applyLimiterRequest(storage, {
       action: "reserve",
@@ -115,5 +115,24 @@ describe("applyLimiterRequest: reserve/release/settle", () => {
       nowMs: nextDayMs,
     });
     expect(result.ok).toBe(true);
+  });
+});
+
+describe("reservations that cross UTC midnight", () => {
+  it("release/settle hit the reservation's own day, leaving the new day's budget untouched", async () => {
+    const storage = fakeStorage();
+    const beforeMidnight = new Date("2026-10-01T23:59:59.000Z").getTime();
+    const afterMidnight = new Date("2026-10-02T00:00:05.000Z").getTime();
+
+    await applyLimiterRequest(storage, { action: "reserve", amountUsd: 0.4, budgetUsd: 0.5, nowMs: beforeMidnight });
+    // The Claude call finishes after midnight; settle/release still target 2026-10-01.
+    await applyLimiterRequest(storage, { action: "settle", reservedAmountUsd: 0.4, actualAmountUsd: 0.1, day: "2026-10-01" });
+    await applyLimiterRequest(storage, { action: "release", amountUsd: 0.4, day: "2026-10-01" });
+
+    // The new day still has exactly its full budget: 0.5 fits, anything more doesn't.
+    const full = await applyLimiterRequest(storage, { action: "reserve", amountUsd: 0.5, budgetUsd: 0.5, nowMs: afterMidnight });
+    expect(full.ok).toBe(true);
+    const over = await applyLimiterRequest(storage, { action: "reserve", amountUsd: 0.01, budgetUsd: 0.5, nowMs: afterMidnight });
+    expect(over.ok).toBe(false);
   });
 });
