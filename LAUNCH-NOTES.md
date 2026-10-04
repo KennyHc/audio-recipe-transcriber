@@ -22,8 +22,9 @@ A running list of things deliberately deferred while launching. Live today:
 - [ ] **Retire the old workers.dev site** (`recipe-transcriber.kennyjiaxi.workers.dev`): it's
       still deployed but can't download models. Replace it with a redirect to pages.dev, or
       delete it (`npx wrangler delete --name recipe-transcriber` — ask first).
-- [ ] **Push the code somewhere**: `feat/initial-app` only exists on this Mac. Add a GitHub
-      remote, merge to `main`, and add CI (typecheck + tests + `build:hosted` secret scan).
+- [x] **Code on GitHub**: https://github.com/KennyHc/audio-recipe-transcriber (`main`).
+- [ ] **CI**: GitHub Actions on every push — `npm run typecheck`, `npm test`, and
+      `npm run build:hosted -w web` (which fails if the bundle contains a key).
 
 ## When usage grows
 
@@ -58,7 +59,8 @@ A running list of things deliberately deferred while launching. Live today:
       iframe. Test before enabling.
 - [ ] **Test on phones and Safari**: Safari WebGPU, the WASM fallback, memory limits with the
       762 MB model, and Wake Lock behaviour.
-- [ ] **Favicon** (currently 404) and social preview image.
+- [x] **Favicon**: noodle-bowl mark (web/public/favicon.svg).
+- [ ] **Social preview image** (Open Graph) for shared links.
 - [ ] Ideas from web/DESIGN-REVIEW.md: import from a video link, shopping list across recipes.
 
 ## Maintenance
