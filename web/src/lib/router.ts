@@ -3,7 +3,8 @@ import { useEffect, useState } from "react";
 export type Route =
   | { name: "library" }
   | { name: "job"; id: string; cook: boolean }
-  | { name: "settings" };
+  | { name: "settings" }
+  | { name: "privacy" };
 
 function parseHash(hash: string): Route {
   const clean = hash.replace(/^#\/?/, "");
@@ -13,6 +14,9 @@ function parseHash(hash: string): Route {
   }
   if (parts[0] === "settings") {
     return { name: "settings" };
+  }
+  if (parts[0] === "privacy") {
+    return { name: "privacy" };
   }
   return { name: "library" };
 }
@@ -43,4 +47,8 @@ export function cookHref(id: string) {
 
 export function settingsHref() {
   return "#/settings";
+}
+
+export function privacyHref() {
+  return "#/privacy";
 }

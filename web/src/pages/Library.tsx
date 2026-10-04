@@ -5,7 +5,7 @@ import { hasApiKey } from "@/backend/settings";
 import { IS_HOSTED } from "@/lib/mode";
 import { UploadZone } from "@/components/UploadZone";
 import { StatusBadge } from "@/components/StatusBadge";
-import { jobHref, settingsHref } from "@/lib/router";
+import { jobHref, privacyHref, settingsHref } from "@/lib/router";
 import { routeIfNeedsSetup } from "@/lib/needsSetup";
 import { Button } from "@/components/ui/button";
 import {
@@ -97,7 +97,20 @@ export function Library() {
           </span>
         </a>
       ) : (
-        <UploadZone onUploaded={refresh} />
+        <div className="space-y-2">
+          <UploadZone onUploaded={refresh} />
+          {backend.kind === "browser" && (
+            <p className="text-xs text-[hsl(var(--ink-faint))]">
+              Audio stays on your device. Only the transcript is sent to make the recipe.{" "}
+              <a
+                href={privacyHref()}
+                className="text-[hsl(var(--ink-muted))] underline underline-offset-2 hover:text-[hsl(var(--ink))]"
+              >
+                Privacy
+              </a>
+            </p>
+          )}
+        </div>
       )}
 
       {error && (

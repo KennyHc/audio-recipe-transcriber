@@ -8,22 +8,20 @@ A running list of things deliberately deferred while launching. Live today:
 
 ## Before sharing the link widely
 
-- [ ] **Self-host the speech models on Cloudflare R2** (free tier: 10 GB, free egress) and serve
-      them from the site's own origin (`/models/*` via a Worker route with Range support).
-      Why: today the browser downloads from Hugging Face, which can rate-limit or block us —
-      it already rejects any request whose Referer is a `*.workers.dev` site (that's why the
-      site is on pages.dev). Same-origin also removes CORS from the picture. Check the licence
-      of the exact onnx-community files before uploading (Whisper itself is MIT).
-- [ ] **Anthropic Console: $10/month spend limit** on the Default workspace — confirm it's set.
+- [ ] ~~Self-host the speech models on Cloudflare R2~~ — **declined for now** (R2 needs a
+      payment method on the Cloudflare account). Models keep coming from Hugging Face, which
+      works from pages.dev. Known risk: Hugging Face rate limits or new blocks (it already
+      rejects any `*.workers.dev` Referer). If downloads start failing for users, revisit
+      self-hosting (R2 or another host that supports Range requests and CORS).
+- [x] **Anthropic Console spend limit** — confirmed set.
       The Worker's $0.50/day cap is the first line; the Console limit is the hard backstop.
 - [ ] **Usage alerts**: Console email alerts at e.g. 50% / 80% of the monthly limit.
 - [ ] **Privacy note / terms page**: audio stays on the device; transcripts go to our Worker and
       Anthropic; local data can be deleted in Settings. Needed before strangers use it.
-- [ ] **Retire the old workers.dev site** (`recipe-transcriber.kennyjiaxi.workers.dev`): it's
-      still deployed but can't download models. Replace it with a redirect to pages.dev, or
-      delete it (`npx wrangler delete --name recipe-transcriber` — ask first).
+- [x] **Old workers.dev site** now 301-redirects to pages.dev (`redirect/`, deploy with
+      `cd redirect && npx wrangler deploy`).
 - [x] **Code on GitHub**: https://github.com/KennyHc/audio-recipe-transcriber (`main`).
-- [ ] **CI**: GitHub Actions on every push — `npm run typecheck`, `npm test`, and
+- [x] **CI**: GitHub Actions (.github/workflows/ci.yml) on every push to main and on PRs — `npm run typecheck`, `npm test`, and
       `npm run build:hosted -w web` (which fails if the bundle contains a key).
 
 ## When usage grows

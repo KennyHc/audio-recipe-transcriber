@@ -1,0 +1,7 @@
+# Replaces the old workers.dev copy of the site with a permanent redirect to Pages.
+# (Hugging Face rejects model downloads from *.workers.dev pages, so the site can't live there.)
+name = "recipe-transcriber"
+main = "index.js"
+compatibility_date = "2026-10-01"
+workers_dev = true
+preview_urls = false

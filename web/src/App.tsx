@@ -1,9 +1,10 @@
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { useRoute } from "@/lib/router";
+import { privacyHref, useRoute } from "@/lib/router";
 import { Library } from "@/pages/Library";
 import { JobPage } from "@/pages/JobPage";
 import { Settings } from "@/pages/Settings";
+import { Privacy } from "@/pages/Privacy";
 import { backend } from "@/backend";
 import { IS_HOSTED } from "@/lib/mode";
 import { Settings as SettingsIcon } from "lucide-react";
@@ -45,12 +46,24 @@ export default function App() {
         <main className="flex-1">
           {route.name === "settings" ? (
             <Settings />
+          ) : route.name === "privacy" ? (
+            <Privacy />
           ) : route.name === "library" ? (
             <Library />
           ) : (
             <JobPage jobId={route.id} cookRoute={route.cook} />
           )}
         </main>
+        <footer className="no-print border-t border-[hsl(var(--border))] py-5">
+          <div className="mx-auto max-w-[1120px] px-4 flex justify-center">
+            <a
+              href={privacyHref()}
+              className="text-xs text-[hsl(var(--ink-faint))] hover:text-[hsl(var(--ink-muted))] transition-colors"
+            >
+              Privacy
+            </a>
+          </div>
+        </footer>
       </div>
     </TooltipProvider>
   );

@@ -29,3 +29,4 @@ eval/results/
 .env.*
 !.env.example
 !.env.*.example
+.wrangler-dry-run/
