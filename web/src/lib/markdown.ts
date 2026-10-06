@@ -1,6 +1,7 @@
 import type { Recipe } from "@recipe/shared";
 import { convertQuantity, convertTemperatureText, type UnitSystem } from "@/lib/units";
 import { formatQuantity, formatUnit, formatDuration } from "@/lib/format";
+import { scaleStepTextPlain } from "@/lib/stepQuantities";
 
 export function recipeToMarkdown(
   recipe: Recipe,
@@ -31,7 +32,7 @@ export function recipeToMarkdown(
 
   lines.push("", "## Steps");
   recipe.steps.forEach((step, i) => {
-    const text = convertTemperatureText(step.text, unitSystem);
+    const text = scaleStepTextPlain(convertTemperatureText(step.text, unitSystem), scaleFactor, unitSystem);
     const extras: string[] = [];
     if (step.durationMinutes !== null) extras.push(formatDuration(step.durationMinutes));
     if (step.temperature) extras.push(convertTemperatureText(step.temperature, unitSystem));

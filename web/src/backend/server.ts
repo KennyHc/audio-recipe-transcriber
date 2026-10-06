@@ -32,5 +32,15 @@ export function createServerBackend(): Backend {
 
     // No model-download consent gate on the server backend; nothing to resume.
     resumeAfterModelConsent: (id) => api.getJob(id),
+
+    putTranscript: (id, transcript) => api.putTranscript(id, transcript),
+
+    // Local-server data already lives as plain files on disk (data/); no browser backup.
+    canBackup: false,
+    exportLibrary: () => Promise.reject(new Error("Backups are only available in the browser versions.")),
+    importLibrary: () => Promise.reject(new Error("Backups are only available in the browser versions.")),
+
+    // No free-use quota when running your own server.
+    getQuota: () => Promise.resolve(null),
   };
 }

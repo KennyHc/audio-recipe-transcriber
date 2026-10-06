@@ -4,9 +4,11 @@ import type { Recipe } from "@recipe/shared";
 import { ChefHat, ChevronLeft, ChevronRight, Clock, Pause, Play, Thermometer, Timer as TimerIcon, X } from "lucide-react";
 import { convertQuantity, convertTemperatureText, type UnitSystem } from "@/lib/units";
 import { formatDuration, formatQuantity, formatUnit } from "@/lib/format";
+import { scaleStepText } from "@/lib/stepQuantities";
 import { ingredientsForStep, stepAudioRange } from "@/lib/cook";
 import { timersReducer, hasActiveTimers, type TimersState } from "@/lib/timers";
 import { StatusPill } from "@/components/StatusPill";
+import { StepText } from "@/components/StepText";
 import { IngredientChips } from "@/components/cook/IngredientChips";
 import { TimerTray } from "@/components/cook/TimerTray";
 import { Button } from "@/components/ui/button";
@@ -453,7 +455,7 @@ function StepSlide({
       <div>
         <div className="font-serif text-[48px] sm:text-[64px] leading-none text-[hsl(var(--accent-text))]">{stepNumber}</div>
         <p className="mt-3 max-w-[32ch] text-[22px] sm:text-[34px] leading-[1.35] text-[hsl(var(--ink))]">
-          {convertTemperatureText(step.text, unitSystem)}
+          <StepText segments={scaleStepText(convertTemperatureText(step.text, unitSystem), scaleFactor, unitSystem)} />
         </p>
       </div>
 

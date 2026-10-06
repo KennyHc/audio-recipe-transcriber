@@ -13,6 +13,12 @@ async function call(stub: DurableObjectStub, body: LimiterRequest): Promise<Limi
   return (await response.json()) as LimiterResponse;
 }
 
+/** Read-only: today's count for this visitor so far (never increments, never throws). */
+export async function peekVisitorCount(stub: DurableObjectStub, visitorId: string, now: Date): Promise<number> {
+  const result = await call(stub, { action: "peekVisitor", visitorId, nowMs: now.getTime() });
+  return "count" in result ? result.count : 0;
+}
+
 /** Throws `rate_limited` if this visitor has used today's /extract allowance. */
 export async function incrementVisitorOrThrow(
   stub: DurableObjectStub,

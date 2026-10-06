@@ -6,12 +6,14 @@ that cut weak or risky ideas and ranked the rest. Nothing here is implemented ye
 
 ## Ranked list (after pass 2)
 
+✅ = shipped (2026-10-07).
+
 | # | Improvement | Why (evidence) | Size |
 |---|---|---|---|
-| 1 | **Edit the transcript, then re-extract** | Whisper misheard "four green onions" as "all green onions" on a real clip; today the only fix is editing the recipe by hand. Letting users correct the transcript (with click-to-hear on each segment, which already exists) fixes the source and re-runs extraction — saved as a new version. | M |
-| 2 | **Scale and convert quantities inside step text** | The servings scaler and Metric/Imperial toggle change the ingredient list but not steps ("add two tablespoons of soy sauce" stays at 2 tbsp when scaled ×2). Show scaled/converted numbers inline in steps (and cook mode), keeping the original on hover. | M |
-| 3 | **Back up / restore the library** | Hosted and in-browser modes keep everything in IndexedDB; clearing site data or switching browsers loses every recipe. Export all recipes + versions (+ optionally audio) to one file and import it back. | S |
-| 4 | **Show the remaining free recipes** | Visitors only learn about the 20/day limit when they hit it. The Worker already counts per visitor — return the remaining count and show "17 of 20 free recipes left today" near the upload zone. | S |
+| 1 | ✅ **Edit the transcript, then re-extract** | Whisper misheard "four green onions" as "all green onions" on a real clip; today the only fix is editing the recipe by hand. Letting users correct the transcript (with click-to-hear on each segment, which already exists) fixes the source and re-runs extraction — saved as a new version. | M |
+| 2 | ✅ **Scale and convert quantities inside step text** | The servings scaler and Metric/Imperial toggle change the ingredient list but not steps ("add two tablespoons of soy sauce" stays at 2 tbsp when scaled ×2). Show scaled/converted numbers inline in steps (and cook mode), keeping the original on hover. | M |
+| 3 | ✅ **Back up / restore the library** | Hosted and in-browser modes keep everything in IndexedDB; clearing site data or switching browsers loses every recipe. Export all recipes + versions (+ optionally audio) to one file and import it back. | S |
+| 4 | ✅ **Show the remaining free recipes** | Visitors only learn about the 20/day limit when they hit it. The Worker already counts per visitor — return the remaining count and show "17 of 20 free recipes left today" near the upload zone. | S |
 | 5 | **Pick the speech model per device** | The 762 MB model is a lot for phones. Use `navigator.deviceMemory`, WebGPU availability, and `connection.saveData` to pre-select small on weak/mobile devices (user can still choose) and say why in the dialog. | S |
 | 6 | **Privacy-safe error reporting** | The Hugging Face block was only found because the user pasted console logs. Send error codes + stage + browser/WebGPU facts (no transcripts, no audio) to the Worker, log them, and update the privacy page. | S |
 | 7 | **"Report a problem with this recipe"** | Real failures are the best eval cases. A button that, with explicit consent, sends the transcript + recipe to a review queue (or downloads a bundle the user can email) — feeds `eval/cases/`. | M |

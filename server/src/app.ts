@@ -10,6 +10,7 @@ import {
   type Job,
   Recipe,
   RollbackRequest,
+  Transcript,
 } from "@recipe/shared";
 import { isJobRunning, runPipeline, runReextract } from "./pipeline/run.ts";
 import {
@@ -24,6 +25,7 @@ import {
   listVersions,
   originalAudioPath,
   saveJob,
+  saveTranscript,
   saveVersion,
 } from "./storage.ts";
 
@@ -134,6 +136,20 @@ app.get("/api/jobs/:id/transcript", async (c) => {
   const transcript = await getTranscript(id);
   if (!transcript) return c.json(apiError("Transcript not available yet."), 404);
   return c.json(transcript);
+});
+
+// PUT /api/jobs/:id/transcript — the user's corrected transcript; the client re-extracts after.
+app.put("/api/jobs/:id/transcript", async (c) => {
+  const id = c.req.param("id");
+  const job = await getJob(id);
+  if (!job) return c.json(apiError("Job not found."), 404);
+  if (isJobRunning(id)) return c.json(apiError("Job is already running."), 409);
+  if (!(await getTranscript(id))) return c.json(apiError("Transcript not available yet."), 404);
+
+  const parsed = Transcript.safeParse(await c.req.json().catch(() => null));
+  if (!parsed.success) return c.json(apiError(`Invalid transcript: ${parsed.error.message}`), 400);
+  await saveTranscript(id, parsed.data);
+  return c.json(parsed.data);
 });
 
 // ---------------------------------------------------------------------------

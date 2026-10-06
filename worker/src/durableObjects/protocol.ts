@@ -2,13 +2,19 @@
 
 export type LimiterRequest =
   | { action: "incrementVisitor"; visitorId: string; limit: number; nowMs: number }
+  // Read-only: reports today's count for this visitor without incrementing it (used by
+  // GET /quota). Never fails/blocks — there's nothing to enforce when only reading.
+  | { action: "peekVisitor"; visitorId: string; nowMs: number }
   | { action: "reserve"; amountUsd: number; budgetUsd: number; nowMs: number }
   // `day` is the UTC date the reservation was made on: release/settle must hit that day's
   // counter, not "today", or a call that crosses midnight would corrupt the new day's budget.
   | { action: "release"; amountUsd: number; day: string }
   | { action: "settle"; reservedAmountUsd: number; actualAmountUsd: number; day: string };
 
-export type LimiterResponse = { ok: true } | { ok: false; retryAfterSeconds: number };
+export type LimiterResponse =
+  | { ok: true }
+  | { ok: false; retryAfterSeconds: number }
+  | { ok: true; count: number };
 
 /** Builds the internal Request sent to the Durable Object's fetch handler. */
 export function buildLimiterRequest(body: LimiterRequest): Request {

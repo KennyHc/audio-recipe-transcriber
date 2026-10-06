@@ -7,6 +7,9 @@ import { Recipe } from "./recipe";
 //   GET  /api/jobs                 -> Job[] (newest first)
 //   GET  /api/jobs/:id             -> Job
 //   GET  /api/jobs/:id/transcript  -> Transcript        (404 until transcribed)
+//   PUT  /api/jobs/:id/transcript  body Transcript -> Transcript  replaces the saved transcript
+//        with the user's corrected version (409 if the job is running; 404 if there is no
+//        transcript yet). Recipe versions are untouched; the client then calls /reextract.
 //   GET  /api/jobs/:id/recipe      -> VersionedRecipe   latest version (404 until done)
 //   PUT  /api/jobs/:id/recipe      body Recipe -> VersionedRecipe  saves user edits as a NEW version
 //   GET  /api/jobs/:id/recipe/versions      -> RecipeVersionMeta[] (newest first)

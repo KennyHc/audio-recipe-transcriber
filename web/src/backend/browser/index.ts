@@ -4,10 +4,13 @@
 // reextract/retry rules, 409-equivalent errors) as plain thrown Errors,
 // since there's no HTTP layer here — the UI calls these methods directly.
 
-import { Recipe, type Job, type Recipe as RecipeType, type RecipeVersionMeta, type Transcript, type VersionedRecipe } from "@recipe/shared";
+import { Recipe, Transcript as TranscriptSchema, type Job, type Recipe as RecipeType, type RecipeVersionMeta, type Transcript, type VersionedRecipe } from "@recipe/shared";
 import type { Backend, JobProgress } from "../types";
 import * as db from "./db";
 import * as runner from "./runner";
+import { exportLibrary, importLibrary } from "./backup";
+import { fetchQuota } from "./quota";
+import { IS_HOSTED } from "@/lib/mode";
 
 const ALLOWED_EXTENSIONS = new Set(["mp3", "m4a", "wav", "webm", "ogg", "mp4", "aac", "flac"]);
 const MAX_UPLOAD_BYTES = 200 * 1024 * 1024; // 200 MB
@@ -215,5 +218,20 @@ export function createBrowserBackend(): Backend {
     getProgress(id: string): JobProgress | null {
       return runner.getProgress(id);
     },
+
+    async putTranscript(id: string, transcript: Transcript): Promise<Transcript> {
+      await requireJob(id);
+      if (runner.isJobRunning(id)) throw new Error("Job is already running.");
+      if (!(await db.getTranscript(id))) throw new Error("This job has no transcript yet.");
+      const parsed = TranscriptSchema.parse(transcript);
+      await db.saveTranscript(id, parsed);
+      return parsed;
+    },
+
+    canBackup: true,
+    exportLibrary: (options) => exportLibrary(options),
+    importLibrary: (file) => importLibrary(file),
+
+    getQuota: () => (IS_HOSTED ? fetchQuota() : Promise.resolve(null)),
   };
 }

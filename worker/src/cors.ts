@@ -1,7 +1,7 @@
 /** Pure CORS decision logic — no Request/Response types, easy to unit test. */
 
 export const ALLOWED_REQUEST_HEADERS = "Content-Type, X-Turnstile-Token";
-export const ALLOWED_METHODS = "POST, OPTIONS";
+export const ALLOWED_METHODS = "GET, POST, OPTIONS";
 
 export function parseAllowedOrigins(allowedOriginsVar: string): string[] {
   return allowedOriginsVar

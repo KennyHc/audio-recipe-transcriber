@@ -75,7 +75,11 @@ export function formatDuration(minutes: number | null | undefined): string {
 
 // Count-ish / word units that get pluralised for quantity > 1. Abbreviations
 // (tbsp, tsp, g, ml, oz, lb, kg, l, fl oz) are never pluralised.
-const PLURAL_UNITS: Record<string, string> = {
+/**
+ * Exported so stepQuantities.ts can recognize the same countable unit words (clove, can,
+ * slice, ...) when scanning free-text step instructions, without duplicating the list.
+ */
+export const PLURAL_UNITS: Record<string, string> = {
   clove: "cloves",
   cup: "cups",
   can: "cans",

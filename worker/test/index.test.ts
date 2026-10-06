@@ -306,6 +306,60 @@ describe("POST /verify", () => {
   });
 });
 
+describe("GET /quota", () => {
+  it("returns the full limit for a new visitor", async () => {
+    const env = testEnv({ PER_VISITOR_DAILY_LIMIT: "20" });
+    const res = await worker.fetch(request("/quota", { method: "GET" }), env);
+    expect(res.status).toBe(200);
+    const json = (await res.json()) as any;
+    expect(json).toEqual({ limit: 20, remaining: 20, resetsInSeconds: expect.any(Number) });
+    expect(json.resetsInSeconds).toBeGreaterThan(0);
+  });
+
+  it("decreases after an /extract and never counts negative", async () => {
+    mockTurnstileSuccess();
+    parseMock.mockResolvedValue({ parsed_output: RECIPE, stop_reason: "end_turn", usage: usage() });
+    const env = testEnv({ PER_VISITOR_DAILY_LIMIT: "2" });
+
+    const before = await worker.fetch(request("/quota", { method: "GET" }), env);
+    expect(((await before.json()) as any).remaining).toBe(2);
+
+    await worker.fetch(request("/extract", { body: { transcript: TRANSCRIPT } }), env);
+    const after = await worker.fetch(request("/quota", { method: "GET" }), env);
+    const afterJson = (await after.json()) as any;
+    expect(afterJson.remaining).toBe(1);
+    expect(afterJson.remaining).toBeGreaterThanOrEqual(0);
+  });
+
+  it("does not itself increment the visitor's count", async () => {
+    mockTurnstileSuccess();
+    parseMock.mockResolvedValue({ parsed_output: RECIPE, stop_reason: "end_turn", usage: usage() });
+    const env = testEnv({ PER_VISITOR_DAILY_LIMIT: "1" });
+
+    // Calling /quota repeatedly must not use up the one allowed /extract call.
+    await worker.fetch(request("/quota", { method: "GET" }), env);
+    await worker.fetch(request("/quota", { method: "GET" }), env);
+    await worker.fetch(request("/quota", { method: "GET" }), env);
+
+    const extractRes = await worker.fetch(request("/extract", { body: { transcript: TRANSCRIPT } }), env);
+    expect(extractRes.status).toBe(200);
+  });
+
+  it("does not require a Turnstile token", async () => {
+    const res = await worker.fetch(
+      request("/quota", { method: "GET", headers: { "X-Turnstile-Token": "" } }),
+      testEnv(),
+    );
+    expect(res.status).toBe(200);
+  });
+
+  it("answers GET preflight with CORS headers", async () => {
+    const res = await worker.fetch(request("/quota", { method: "OPTIONS" }), testEnv());
+    expect(res.status).toBe(204);
+    expect(res.headers.get("Access-Control-Allow-Methods")).toContain("GET");
+  });
+});
+
 describe("fails closed on missing configuration", () => {
   it.each([
     ["missing VISITOR_SALT", { VISITOR_SALT: "" }],

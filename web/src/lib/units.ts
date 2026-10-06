@@ -5,7 +5,7 @@ export type UnitSystem = "original" | "metric" | "imperial";
 
 type Dimension = "volume" | "weight";
 
-interface UnitDef {
+export interface UnitDef {
   canonical: string; // short display form, e.g. "tbsp"
   dimension: Dimension;
   toBase: number; // multiplier to base unit (ml for volume, g for weight)
@@ -13,6 +13,21 @@ interface UnitDef {
 
 // Base units: volume -> ml, weight -> g.
 const UNIT_ALIASES: Record<string, UnitDef> = {};
+
+/**
+ * Read-only view of the measured-unit alias table (tsp/tbsp/cup/ml/g/...), so other
+ * modules (e.g. stepQuantities.ts, which finds quantity+unit mentions in free-text step
+ * instructions) can recognize/scale the same units `convertQuantity` knows about, without
+ * duplicating the alias list.
+ */
+export function lookupMeasuredUnit(unit: string): UnitDef | undefined {
+  return UNIT_ALIASES[unit.trim().toLowerCase()];
+}
+
+/** All recognized alias words/phrases for measured units, e.g. "tbsp", "tablespoons". */
+export function measuredUnitWords(): string[] {
+  return Object.keys(UNIT_ALIASES);
+}
 
 function reg(aliases: string[], canonical: string, dimension: Dimension, toBase: number) {
   const def: UnitDef = { canonical, dimension, toBase };

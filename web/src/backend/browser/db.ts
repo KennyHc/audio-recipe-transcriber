@@ -180,6 +180,14 @@ export async function saveVersion(
   return versioned;
 }
 
+/** Writes a version record exactly as given (preserving its number and meta), without
+ * assigning a new version number or touching job.title — used by library restore to put
+ * back a backed-up version verbatim. */
+export async function putVersionRaw(jobId: string, versioned: VersionedRecipe): Promise<void> {
+  const db = await getDb();
+  await db.put("versions", { jobId, version: versioned.meta.version, versioned });
+}
+
 export async function listVersions(jobId: string): Promise<RecipeVersionMeta[]> {
   const db = await getDb();
   const records = await db.getAllFromIndex("versions", "byJob", jobId);

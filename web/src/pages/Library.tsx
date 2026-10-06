@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
-import type { Job } from "@recipe/shared";
+import type { Job, QuotaResponse } from "@recipe/shared";
 import { backend } from "@/backend";
 import { hasApiKey } from "@/backend/settings";
 import { IS_HOSTED } from "@/lib/mode";
@@ -27,14 +27,29 @@ import { NoodlesLogo } from "@/components/NoodlesLogo";
 import { formatFriendlyDate } from "@/lib/format";
 import { MoreHorizontal, Trash2, KeyRound, UploadCloud, Laptop, ListChecks } from "lucide-react";
 
+/** "3 hours" / "1 hour" — same rounding as proxyClaude.ts's describeProxyError. */
+function formatResetHours(seconds: number): string {
+  const hours = Math.max(1, Math.round(seconds / 3600));
+  return `${hours} hour${hours === 1 ? "" : "s"}`;
+}
+
 export function Library() {
   const [jobs, setJobs] = useState<Job[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Job | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [quota, setQuota] = useState<QuotaResponse | null>(null);
 
   // Hosted mode never needs a key — Claude calls go through the operator's Worker.
   const needsSetup = backend.kind === "browser" && !IS_HOSTED && !hasApiKey();
+
+  // Only non-null in hosted mode (backend.getQuota() returns null elsewhere).
+  const quotaExhausted = quota != null && quota.remaining <= 0;
+  const quotaMessage = quota
+    ? quotaExhausted
+      ? `You've used today's ${quota.limit} free recipes — more in ${formatResetHours(quota.resetsInSeconds)}`
+      : `${quota.remaining} of ${quota.limit} free recipes left today`
+    : null;
 
   const refresh = useCallback(() => {
     backend
@@ -46,9 +61,20 @@ export function Library() {
       });
   }, []);
 
+  const refreshQuota = useCallback(() => {
+    backend
+      .getQuota()
+      .then(setQuota)
+      .catch(() => setQuota(null));
+  }, []);
+
+  // Refresh both on mount and whenever the Library is shown again (e.g. navigating back
+  // from a job page) — this component remounts on each route change, so a plain mount
+  // effect covers "returning to the library" too.
   useEffect(() => {
     refresh();
-  }, [refresh]);
+    refreshQuota();
+  }, [refresh, refreshQuota]);
 
   async function confirmDelete() {
     if (!deleteTarget) return;
@@ -113,7 +139,17 @@ export function Library() {
               </a>
             ) : (
               <>
-                <UploadZone onUploaded={refresh} />
+                <UploadZone
+                  onUploaded={() => {
+                    refresh();
+                    refreshQuota();
+                  }}
+                  disabled={quotaExhausted}
+                  disabledMessage={quotaMessage ?? undefined}
+                />
+                {quotaMessage && (
+                  <p className="text-xs text-[hsl(var(--ink-faint))]">{quotaMessage}</p>
+                )}
                 {backend.kind === "browser" && (
                   <p className="text-xs text-[hsl(var(--ink-faint))]">
                     Audio stays on your device. Only the transcript is sent to make the recipe.{" "}

@@ -1,13 +1,15 @@
-import { useEffect, useState } from "react";
-import { ArrowLeft, Eye, EyeOff, KeyRound, Trash2, AlertTriangle, Sparkles } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { ArrowLeft, Eye, EyeOff, KeyRound, Trash2, AlertTriangle, Sparkles, Download, Upload, Loader2 } from "lucide-react";
 import { consumeSetupMessage } from "@/lib/needsSetup";
 import { getBrowserSettings, saveBrowserSettings, maskApiKey } from "@/backend/settings";
 import { BROWSER_DB_NAME } from "@/backend/constants";
 import { deleteAllModelChunks } from "@/backend/browser/modelDownloader";
 import { SPEECH_MODEL_CATALOG, speechModelKey } from "@/backend/browser/modelCatalog";
 import { DEFAULT_BROWSER_SETTINGS } from "@/backend/types";
+import { backend } from "@/backend";
 import { IS_HOSTED } from "@/lib/mode";
 import { formatMB } from "@/lib/downloadProgress";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -43,9 +45,74 @@ export function Settings() {
   const [deleting, setDeleting] = useState(false);
   const [setupMessage, setSetupMessage] = useState<string | null>(null);
 
+  const [includeAudio, setIncludeAudio] = useState(false);
+  const [estimatedBackupBytes, setEstimatedBackupBytes] = useState<number | null>(null);
+  const [downloadingBackup, setDownloadingBackup] = useState(false);
+  const [restoring, setRestoring] = useState(false);
+  const [restoreResult, setRestoreResult] = useState<string | null>(null);
+  const [restoreError, setRestoreError] = useState<string | null>(null);
+  const restoreInputRef = useRef<HTMLInputElement>(null);
+
   useEffect(() => {
     setSetupMessage(consumeSetupMessage());
   }, []);
+
+  // Estimated backup size: the export itself is the only accurate way to know this (it
+  // depends on every job's transcript/versions and, when checked, audio), so recompute it
+  // whenever the "include audio" checkbox changes. Cheap for a typical local library.
+  useEffect(() => {
+    if (!backend.canBackup) return;
+    let cancelled = false;
+    backend
+      .exportLibrary({ includeAudio })
+      .then((blob) => {
+        if (!cancelled) setEstimatedBackupBytes(blob.size);
+      })
+      .catch(() => {
+        if (!cancelled) setEstimatedBackupBytes(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [includeAudio]);
+
+  async function handleDownloadBackup() {
+    setDownloadingBackup(true);
+    try {
+      const blob = await backend.exportLibrary({ includeAudio });
+      const today = new Date().toISOString().slice(0, 10);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `recipes-${today}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setRestoreError(null);
+      setRestoreResult(null);
+      setRestoreError(err instanceof Error ? err.message : "Couldn't create the backup file.");
+    } finally {
+      setDownloadingBackup(false);
+    }
+  }
+
+  async function handleRestoreFile(file: File) {
+    setRestoring(true);
+    setRestoreResult(null);
+    setRestoreError(null);
+    try {
+      const { imported, skipped } = await backend.importLibrary(file);
+      const parts = [`Imported ${imported} recipe${imported === 1 ? "" : "s"}`];
+      if (skipped > 0) parts.push(`skipped ${skipped} already here`);
+      setRestoreResult(parts.join(", ") + ".");
+    } catch (err) {
+      setRestoreError(err instanceof Error ? err.message : "Failed to restore backup.");
+    } finally {
+      setRestoring(false);
+    }
+  }
 
   function persist(next: typeof settings) {
     setSettings(next);
@@ -259,6 +326,70 @@ export function Settings() {
           </p>
         </div>
       </section>
+
+      {backend.canBackup && (
+        <section className="space-y-4 rounded-[10px] border border-[hsl(var(--border))] bg-[hsl(var(--surface))] p-5 sm:p-6">
+          <h2 className="text-[12px] font-medium uppercase tracking-[0.08em] text-[hsl(var(--ink-muted))]">
+            Your library
+          </h2>
+          <p className="text-sm text-[hsl(var(--ink-muted))]">
+            Recipes live only in this browser — download a backup to keep them safe.
+          </p>
+
+          <div className="space-y-2.5">
+            <label className="checkbox-row flex items-center gap-2.5 text-sm text-[hsl(var(--ink))]">
+              <Checkbox
+                checked={includeAudio}
+                onChange={() => setIncludeAudio((v) => !v)}
+                ariaLabel="Include audio in the backup"
+              />
+              Include audio (larger file)
+            </label>
+            <p className="text-xs text-[hsl(var(--ink-faint))]">
+              {estimatedBackupBytes != null
+                ? `Estimated size: ${estimatedBackupBytes < 1_000_000 ? "under 1 MB" : formatMB(estimatedBackupBytes)}`
+                : "Estimating size…"}
+            </p>
+            <Button onClick={handleDownloadBackup} disabled={downloadingBackup}>
+              {downloadingBackup ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Download className="h-3.5 w-3.5" />
+              )}
+              Download backup
+            </Button>
+          </div>
+
+          <div className="space-y-2.5 border-t border-[hsl(var(--border))] pt-4">
+            <p className="text-sm font-medium text-[hsl(var(--ink))]">Restore from backup</p>
+            <input
+              ref={restoreInputRef}
+              type="file"
+              accept="application/json"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                e.target.value = "";
+                if (file) void handleRestoreFile(file);
+              }}
+            />
+            <Button
+              variant="outline"
+              onClick={() => restoreInputRef.current?.click()}
+              disabled={restoring}
+            >
+              {restoring ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
+              Choose backup file…
+            </Button>
+            {restoreResult && <p className="text-sm text-[hsl(var(--accent-text))]">{restoreResult}</p>}
+            {restoreError && (
+              <p role="alert" className="text-sm text-[hsl(var(--danger))]">
+                {restoreError}
+              </p>
+            )}
+          </div>
+        </section>
+      )}
 
       <section className="space-y-3 rounded-[10px] border border-[hsl(var(--danger))]/30 bg-[hsl(var(--surface))] p-5 sm:p-6">
         <h2 className="text-[12px] font-medium uppercase tracking-[0.08em] text-[hsl(var(--ink-muted))]">

@@ -32,6 +32,11 @@ export function rolloverBudget(state: BudgetDayState | undefined, today: string)
   return { date: today, reservedUsd: 0, settledUsd: 0 };
 }
 
+/** Read-only: today's count for this visitor, without incrementing it. */
+export function peekVisitorCount(state: VisitorDayState | undefined, today: string): number {
+  return rolloverVisitor(state, today).count;
+}
+
 /** Atomically (from the caller's perspective) checks and increments the per-visitor daily count. */
 export function tryIncrementVisitor(
   state: VisitorDayState | undefined,

@@ -1,6 +1,7 @@
 import {
   ExtractRequest,
   type ExtractResponse,
+  type QuotaResponse,
   TURNSTILE_HEADER,
   VerifyRequest,
   type VerifyResponse,
@@ -10,6 +11,7 @@ import { actualCostUsd, estimateMaxCostUsd } from "./cost";
 import {
   getLimiterStub,
   incrementVisitorOrThrow,
+  peekVisitorCount,
   releaseReservation,
   reserveOrThrow,
   settleReservation,
@@ -18,7 +20,7 @@ import { LimiterDO } from "./durableObjects/limiter";
 import { AppError, appError, sanitizedErrorLog, toErrorResponseParts } from "./errors";
 import { EXTRACT_MAX_TOKENS, extractRecipe } from "./llm/extract";
 import { VERIFY_MAX_TOKENS, verifyRecipe } from "./llm/verify";
-import { utcDateString } from "./rollover";
+import { secondsUntilNextUtcMidnight, utcDateString } from "./rollover";
 import { verifyTurnstile } from "./turnstile";
 import type { Env } from "./types";
 import { assertTranscriptSizeOrThrow, parseBodyOrThrow, transcriptChars } from "./validation";
@@ -45,7 +47,11 @@ export default {
     try {
       assertConfiguredOrThrow(env);
       const body =
-        route === "extract" ? await handleExtract(env, request) : await handleVerify(env, request);
+        route === "extract"
+          ? await handleExtract(env, request)
+          : route === "verify"
+            ? await handleVerify(env, request)
+            : await handleQuota(env, request);
       return jsonResponse(200, body, cors);
     } catch (err) {
       const { status, body } = toErrorResponseParts(err);
@@ -79,7 +85,8 @@ function assertConfiguredOrThrow(env: Env): void {
   }
 }
 
-function routeFor(method: string, pathname: string): "extract" | "verify" | null {
+function routeFor(method: string, pathname: string): "extract" | "verify" | "quota" | null {
+  if (method === "GET" && pathname === "/quota") return "quota";
   if (method !== "POST") return null;
   if (pathname === "/extract") return "extract";
   if (pathname === "/verify") return "verify";
@@ -129,6 +136,22 @@ async function handleVerify(env: Env, request: Request): Promise<VerifyResponse>
     await releaseReservation(stub, reserved, utcDateString(now));
     throw err;
   }
+}
+
+async function handleQuota(env: Env, request: Request): Promise<QuotaResponse> {
+  // Read-only: no Turnstile check, no increment — just reports today's remaining allowance
+  // for the same visitor identity /extract would use.
+  const stub = getLimiterStub(env.LIMITER);
+  const now = new Date();
+  const ip = clientIp(request);
+  const visitorId = await computeVisitorId(ip, env.VISITOR_SALT, utcDateString(now));
+  const limit = Number(env.PER_VISITOR_DAILY_LIMIT);
+  const count = await peekVisitorCount(stub, visitorId, now);
+  return {
+    limit,
+    remaining: Math.max(0, limit - count),
+    resetsInSeconds: secondsUntilNextUtcMidnight(now),
+  };
 }
 
 async function requireTurnstile(env: Env, request: Request): Promise<void> {

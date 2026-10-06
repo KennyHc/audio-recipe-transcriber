@@ -1,6 +1,7 @@
 import {
   type BudgetDayState,
   type VisitorDayState,
+  peekVisitorCount,
   release,
   settle,
   tryIncrementVisitor,
@@ -47,6 +48,14 @@ export async function applyLimiterRequest(
       if (!result.ok) return result;
       await storage.put(key, result.state);
       return { ok: true };
+    }
+
+    case "peekVisitor": {
+      const now = new Date(request.nowMs);
+      const today = utcDateString(now);
+      const key = visitorKey(today, request.visitorId);
+      const current = await storage.get<VisitorDayState>(key);
+      return { ok: true, count: peekVisitorCount(current, today) };
     }
 
     case "reserve": {

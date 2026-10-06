@@ -341,6 +341,16 @@ export function JobPage({ jobId, cookRoute }: { jobId: string; cookRoute: boolea
     }
   }
 
+  /** Called by TranscriptView once it has saved the corrected transcript and kicked off
+   * `reextract` itself — this just resumes the existing polling/stepper and switches back
+   * to the Recipe tab so the user watches Extracting → Checking → Done on the new version. */
+  function handleTranscriptReextracted(j: Job) {
+    setJob(j);
+    setViewingVersion(null);
+    setActiveTab("recipe");
+    setPollKey((k) => k + 1);
+  }
+
   async function handleRetry() {
     setRetrying(true);
     setRetryError(null);
@@ -660,9 +670,13 @@ export function JobPage({ jobId, cookRoute }: { jobId: string; cookRoute: boolea
               <TabsContent value="transcript">
                 {transcript && (
                   <TranscriptView
+                    jobId={jobId}
                     transcript={transcript}
                     currentTime={currentTime}
                     onSeek={seekTo}
+                    canEdit={!isViewingOld}
+                    onTranscriptSaved={setTranscript}
+                    onReextracted={handleTranscriptReextracted}
                   />
                 )}
               </TabsContent>

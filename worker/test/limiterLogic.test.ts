@@ -51,6 +51,34 @@ describe("applyLimiterRequest: incrementVisitor", () => {
   });
 });
 
+describe("applyLimiterRequest: peekVisitor", () => {
+  it("reports 0 for a visitor that has never incremented", async () => {
+    const storage = fakeStorage();
+    const result = await applyLimiterRequest(storage, { action: "peekVisitor", visitorId: "v1", nowMs: NOW_MS });
+    expect(result.ok).toBe(true);
+    if (result.ok && "count" in result) expect(result.count).toBe(0);
+  });
+
+  it("reflects increments without itself incrementing", async () => {
+    const storage = fakeStorage();
+    await applyLimiterRequest(storage, { action: "incrementVisitor", visitorId: "v1", limit: 20, nowMs: NOW_MS });
+    await applyLimiterRequest(storage, { action: "incrementVisitor", visitorId: "v1", limit: 20, nowMs: NOW_MS });
+
+    const first = await applyLimiterRequest(storage, { action: "peekVisitor", visitorId: "v1", nowMs: NOW_MS });
+    const second = await applyLimiterRequest(storage, { action: "peekVisitor", visitorId: "v1", nowMs: NOW_MS });
+    if (first.ok && "count" in first) expect(first.count).toBe(2);
+    if (second.ok && "count" in second) expect(second.count).toBe(2); // unchanged by the peek itself
+  });
+
+  it("rolls over to 0 on a new UTC day", async () => {
+    const storage = fakeStorage();
+    await applyLimiterRequest(storage, { action: "incrementVisitor", visitorId: "v1", limit: 20, nowMs: NOW_MS });
+    const nextDayMs = new Date("2026-10-02T00:00:01.000Z").getTime();
+    const result = await applyLimiterRequest(storage, { action: "peekVisitor", visitorId: "v1", nowMs: nextDayMs });
+    if (result.ok && "count" in result) expect(result.count).toBe(0);
+  });
+});
+
 describe("applyLimiterRequest: reserve/release/settle", () => {
   it("reserve fails once the budget would be exceeded", async () => {
     const storage = fakeStorage();

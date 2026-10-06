@@ -50,6 +50,7 @@ export function RecipeView({
             <StepsList
               steps={recipe.steps}
               unitSystem={unitSystem}
+              scaleFactor={scaleFactor}
               warnings={recipe.warnings}
               onSeek={onSeek}
               currentTime={currentTime}

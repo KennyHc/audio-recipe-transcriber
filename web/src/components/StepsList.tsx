@@ -1,20 +1,24 @@
 import type { Step, RecipeWarning } from "@recipe/shared";
 import { convertTemperatureText, type UnitSystem } from "@/lib/units";
 import { formatDuration } from "@/lib/format";
+import { scaleStepText } from "@/lib/stepQuantities";
 import { TimestampButton } from "@/components/TimestampButton";
 import { StatusPill } from "@/components/StatusPill";
+import { StepText } from "@/components/StepText";
 import { Clock, Thermometer } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export function StepsList({
   steps,
   unitSystem,
+  scaleFactor,
   warnings,
   onSeek,
   currentTime,
 }: {
   steps: Step[];
   unitSystem: UnitSystem;
+  scaleFactor: number;
   warnings: RecipeWarning[];
   onSeek: (seconds: number) => void;
   currentTime: number | null;
@@ -32,6 +36,7 @@ export function StepsList({
         const targetWarnings = warnings.filter((w) => w.target === `steps[${i}]`);
         const isActive = i === activeIndex;
         const highlighted = targetWarnings.length > 0 || isActive;
+        const stepSegments = scaleStepText(convertTemperatureText(step.text, unitSystem), scaleFactor, unitSystem);
 
         return (
           <li
@@ -53,7 +58,7 @@ export function StepsList({
             </span>
             <div className="flex-1 min-w-0 space-y-1.5 pt-0.5">
               <p className="max-w-[70ch] text-[15px] sm:text-[17px] leading-[1.6]">
-                {convertTemperatureText(step.text, unitSystem)}
+                <StepText segments={stepSegments} />
               </p>
               <div className="flex flex-wrap items-center gap-1.5">
                 {step.durationMinutes !== null && (

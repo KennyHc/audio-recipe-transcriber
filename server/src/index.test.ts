@@ -259,3 +259,24 @@ describe("HTTP routes (real app)", () => {
     });
   });
 });
+
+describe("PUT /api/jobs/:id/transcript", () => {
+  it("saves a corrected transcript and rejects bad bodies and unknown jobs", async () => {
+    const { createJob, deleteJob, saveTranscript, getTranscript } = await import("./storage");
+    const id = `test-transcript-${Date.now()}`;
+    const now = new Date().toISOString();
+    await createJob({ id, fileName: "a.mp3", status: "done", error: null, title: null, createdAt: now, updatedAt: now });
+    await saveTranscript(id, { language: "en", segments: [{ start: 0, end: 2, text: "chop all green onions" }] });
+
+    const corrected = { language: "en", segments: [{ start: 0, end: 2, text: "chop four green onions" }] };
+    const ok = await app.request(`/api/jobs/${id}/transcript`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(corrected) });
+    expect(ok.status).toBe(200);
+    expect((await getTranscript(id))?.segments[0]?.text).toBe("chop four green onions");
+
+    const bad = await app.request(`/api/jobs/${id}/transcript`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ segments: "nope" }) });
+    expect(bad.status).toBe(400);
+    const missing = await app.request(`/api/jobs/no-such-job/transcript`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(corrected) });
+    expect(missing.status).toBe(404);
+    await deleteJob(id);
+  });
+});

@@ -1,4 +1,4 @@
-import type { Job, Recipe, RecipeVersionMeta, Transcript, VersionedRecipe } from "@recipe/shared";
+import type { Job, QuotaResponse, Recipe, RecipeVersionMeta, Transcript, VersionedRecipe } from "@recipe/shared";
 
 // The UI talks to exactly one Backend, chosen at build time (see ./index.ts):
 //   "server"  — the local Node server (whisper.cpp + Claude via CLI or API key).
@@ -54,6 +54,17 @@ export interface Backend {
    * job unchanged on the server backend, which never sets that flag.
    */
   resumeAfterModelConsent(id: string): Promise<Job>;
+
+  /** Replaces the saved transcript with the user's corrected one (then call reextract). */
+  putTranscript(id: string, transcript: Transcript): Promise<Transcript>;
+
+  /** Whole-library backup (browser/hosted modes only; `canBackup` tells the UI). */
+  canBackup: boolean;
+  exportLibrary(options: { includeAudio: boolean }): Promise<Blob>;
+  importLibrary(file: File): Promise<{ imported: number; skipped: number }>;
+
+  /** Today's free-recipe allowance in hosted mode; null in other modes or if unavailable. */
+  getQuota(): Promise<QuotaResponse | null>;
 
   /** Errors like "no API key" are thrown with this code so the UI can route to Settings. */
 }

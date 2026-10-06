@@ -46,6 +46,15 @@ export const api = {
     return parseJson(res, VersionedRecipe);
   },
 
+  async putTranscript(id: string, transcript: Transcript): Promise<Transcript> {
+    const res = await fetch(`/api/jobs/${encodeURIComponent(id)}/transcript`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(transcript),
+    });
+    return parseJson(res, Transcript);
+  },
+
   async putRecipe(id: string, recipe: Recipe): Promise<VersionedRecipe> {
     const res = await fetch(`/api/jobs/${encodeURIComponent(id)}/recipe`, {
       method: "PUT",

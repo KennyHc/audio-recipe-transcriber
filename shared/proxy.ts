@@ -9,6 +9,9 @@ import { ExtractedRecipe, RecipeWarning, Transcript } from "./recipe";
 //
 //   POST {API_BASE}/extract   body ExtractRequest  -> ExtractResponse
 //   POST {API_BASE}/verify    body VerifyRequest   -> VerifyResponse
+//   GET  {API_BASE}/quota                          -> QuotaResponse
+//        Read-only: today's per-visitor allowance. No Turnstile token needed (it never
+//        calls Claude and doesn't change any counter).
 //
 // Every request must carry a fresh Cloudflare Turnstile token in the
 // `X-Turnstile-Token` header (tokens are single-use; get a new one per request).
@@ -48,3 +51,10 @@ export const ProxyError = z.object({
   retryAfterSeconds: z.number().nullable(), // e.g. seconds until the next UTC day
 });
 export type ProxyError = z.infer<typeof ProxyError>;
+
+export const QuotaResponse = z.object({
+  limit: z.number(), // recipes per visitor per UTC day
+  remaining: z.number(), // never negative
+  resetsInSeconds: z.number(), // until next UTC midnight
+});
+export type QuotaResponse = z.infer<typeof QuotaResponse>;

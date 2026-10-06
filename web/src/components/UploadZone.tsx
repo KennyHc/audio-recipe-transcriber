@@ -12,13 +12,24 @@ function hasAcceptedExtension(name: string): boolean {
   return ACCEPTED_EXTENSIONS.some((ext) => lower.endsWith(ext));
 }
 
-export function UploadZone({ onUploaded }: { onUploaded: () => void }) {
+export function UploadZone({
+  onUploaded,
+  disabled = false,
+  disabledMessage,
+}: {
+  onUploaded: () => void;
+  /** When true, the dropzone no longer accepts files (e.g. today's free quota is used up). */
+  disabled?: boolean;
+  /** Shown in place of the normal headline/caption while `disabled` is true. */
+  disabledMessage?: string;
+}) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
   const [progress, setProgress] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   function startUpload(file: File) {
+    if (disabled) return;
     if (!hasAcceptedExtension(file.name)) {
       setError(
         `"${file.name}" doesn't look like a supported audio file. Try ${ACCEPTED_EXTENSIONS.join(", ")}.`,
@@ -46,26 +57,32 @@ export function UploadZone({ onUploaded }: { onUploaded: () => void }) {
       <div
         onDragOver={(e) => {
           e.preventDefault();
-          setDragging(true);
+          if (!disabled) setDragging(true);
         }}
         onDragLeave={() => setDragging(false)}
         onDrop={(e) => {
           e.preventDefault();
           setDragging(false);
+          if (disabled) return;
           const file = e.dataTransfer.files?.[0];
           if (file) startUpload(file);
         }}
         className={cn(
-          "group flex min-h-[120px] sm:min-h-[132px] items-center rounded-[12px] border-2 border-dashed px-4 py-4 transition-colors cursor-pointer",
-          dragging
+          "group flex min-h-[120px] sm:min-h-[132px] items-center rounded-[12px] border-2 border-dashed px-4 py-4 transition-colors",
+          disabled
+            ? "cursor-not-allowed border-[hsl(var(--border))] bg-[hsl(var(--sunken))]"
+            : "cursor-pointer",
+          !disabled && dragging
             ? "border-[hsl(var(--accent-fill))] bg-[hsl(var(--accent-tint))]"
-            : "border-[hsl(var(--border-strong))] bg-[hsl(var(--surface))] hover:border-[hsl(var(--accent-fill))]/60 hover:bg-[hsl(var(--accent-tint))]/40",
+            : !disabled &&
+              "border-[hsl(var(--border-strong))] bg-[hsl(var(--surface))] hover:border-[hsl(var(--accent-fill))]/60 hover:bg-[hsl(var(--accent-tint))]/40",
         )}
         role="button"
-        tabIndex={0}
-        onClick={() => inputRef.current?.click()}
+        aria-disabled={disabled}
+        tabIndex={disabled ? -1 : 0}
+        onClick={() => !disabled && inputRef.current?.click()}
         onKeyDown={(e) => {
-          if (e.key === "Enter" || e.key === " ") inputRef.current?.click();
+          if (!disabled && (e.key === "Enter" || e.key === " ")) inputRef.current?.click();
         }}
       >
         <input
@@ -73,13 +90,23 @@ export function UploadZone({ onUploaded }: { onUploaded: () => void }) {
           type="file"
           accept={ACCEPTED_EXTENSIONS.join(",")}
           className="hidden"
+          disabled={disabled}
           onChange={(e) => {
             const file = e.target.files?.[0];
             if (file) startUpload(file);
             e.target.value = "";
           }}
         />
-        {progress !== null ? (
+        {disabled ? (
+          <div className="flex w-full flex-col items-center gap-2 text-center">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[hsl(var(--sunken))] text-[hsl(var(--ink-faint))]">
+              <UploadCloud className="h-4 w-4" />
+            </span>
+            <p className="max-w-[28ch] text-balance text-sm font-medium text-[hsl(var(--ink-muted))]">
+              {disabledMessage ?? "Uploads are unavailable right now."}
+            </p>
+          </div>
+        ) : progress !== null ? (
           <div className="flex w-full flex-col items-center gap-2 text-center">
             <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[hsl(var(--accent-tint))]">
               <Loader2 className="h-4 w-4 animate-spin text-[hsl(var(--accent-text))]" />
