@@ -1,6 +1,6 @@
 import {
   type ExtractedRecipe,
-  ensureAmountWarnings,
+  finalizeWarnings,
   formatVerifierUserMessage,
   type RecipeWarning,
   type Transcript,
@@ -25,5 +25,5 @@ export async function verifyRecipe(
     schema: VerifierOutput,
     maxTokens: VERIFY_MAX_TOKENS,
   });
-  return { warnings: ensureAmountWarnings(recipe, output.warnings), usage };
+  return { warnings: finalizeWarnings(recipe, output.warnings), usage };
 }

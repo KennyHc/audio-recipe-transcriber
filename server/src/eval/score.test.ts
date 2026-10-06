@@ -94,6 +94,7 @@ function baseRubric(overrides: Partial<Rubric> = {}): Rubric {
     forbiddenIngredients: [],
     stepsInOrder: [],
     mustWarnAbout: [],
+    mustNotWarn: [],
     ...overrides,
   };
 }
@@ -214,5 +215,37 @@ describe("scoreRecipe synthetic cases", () => {
     const score = scoreRecipe(recipe, rubric);
     const check = score.checks.find((c) => c.name === "title");
     expect(check?.pass).toBe(false);
+  });
+});
+
+describe("mustNotWarn (false alarms)", () => {
+  const recipe = baseRecipe({
+    ingredients: [ingredient({ item: "cooking oil", quantity: 2, unit: "tablespoons" }), ingredient({ item: "salt" })],
+    warnings: [
+      { kind: "unused_ingredient", message: "Listed but never used in a step.", target: "ingredients[0]", suggestion: null },
+      { kind: "vague_quantity", message: "A pinch of salt is imprecise.", target: "ingredients[1]", suggestion: "~1/4 tsp" },
+    ],
+  });
+
+  it("fails when a forbidden kind of warning targets a matching ingredient", () => {
+    const score = scoreRecipe(recipe, baseRubric({ mustNotWarn: [{ kinds: ["unused_ingredient"], about: ["oil"] }] }));
+    const check = score.checks.find((c) => c.name.startsWith("no false"));
+    expect(check?.pass).toBe(false);
+    expect(check?.detail).toContain("unused_ingredient");
+  });
+
+  it("ignores other kinds and other ingredients", () => {
+    const score = scoreRecipe(
+      recipe,
+      baseRubric({
+        mustNotWarn: [
+          { kinds: ["unused_ingredient"], about: ["salt"] }, // salt's warning is vague_quantity, allowed
+          { kinds: ["missing_ingredient"], about: ["oil"] },
+        ],
+      }),
+    );
+    const falseAlarmChecks = score.checks.filter((c) => c.name.startsWith("no false"));
+    expect(falseAlarmChecks).toHaveLength(2);
+    expect(falseAlarmChecks.every((c) => c.pass)).toBe(true);
   });
 });

@@ -2,6 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import {
   ensureAmountWarnings,
+  finalizeWarnings,
   formatVerifierUserMessage,
   type ExtractedRecipe,
   type RecipeWarning,
@@ -28,7 +29,7 @@ export async function verifyRecipe(
   transcript: Transcript,
   recipe: ExtractedRecipe,
 ): Promise<RecipeWarning[]> {
-  return ensureAmountWarnings(recipe, await callVerifier(transcript, recipe));
+  return finalizeWarnings(recipe, await callVerifier(transcript, recipe));
 }
 
 export { ensureAmountWarnings };

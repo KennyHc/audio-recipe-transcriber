@@ -41,9 +41,11 @@ A running list of things deliberately deferred while launching. Live today:
 
 - [ ] **More eval cases** (`eval/cases/`): only 2 real cases today. Aim for 10+ varied clips
       (accents, long tangents, multiple quantities, non-English).
-- [ ] **Haiku verifier false positive**: on the egg-fried-rice browser run it flagged
-      "2 tablespoons cooking oil" as *unused* although step 7 uses it. Add an eval check and
-      tune the verifier prompt (or use Sonnet for verify if Haiku stays noisy).
+- [x] **Haiku false alarms / invented amounts**: deterministic rules in shared/warnings.ts now
+      run after the models in every runtime — drop "unused" warnings for ingredients a step
+      mentions, always flag missing amounts (unless "to taste" etc.), never show a quantity on
+      an "inferred" ingredient, merge duplicate warnings. Eval (Haiku/Haiku, 3 runs):
+      egg-fried-rice 90% → 98%, garlic pasta 100%. Rubrics can now assert `mustNotWarn`.
 - [ ] **Whisper "four" vs "all"**: large-v3-turbo misheard a quantity on the real clip. Flagged
       items + click-to-hear mitigate it; consider prompting Whisper with cooking vocabulary in
       the browser too (the server already does).

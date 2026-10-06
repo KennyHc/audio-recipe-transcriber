@@ -9,7 +9,8 @@ import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import {
   EXTRACTOR_SYSTEM,
   ExtractedRecipe,
-  ensureAmountWarnings,
+  finalizeWarnings,
+  normalizeExtractedRecipe,
   formatTranscriptForPrompt,
   formatVerifierUserMessage,
   VERIFIER_SYSTEM,
@@ -109,12 +110,12 @@ export async function extractRecipe(transcript: Transcript, settings: BrowserSet
     throw new ExtractionError("The extractor model did not return a parseable recipe.");
   }
 
-  return response.parsed_output;
+  return normalizeExtractedRecipe(response.parsed_output);
 }
 
 /**
  * Runs the verifier agent against a transcript + extracted recipe and
- * returns its warnings (with ensureAmountWarnings applied). Throws
+ * returns its warnings (with finalizeWarnings applied). Throws
  * NeedsSetupError if no API key is configured, or VerificationError on
  * failure — callers should catch VerificationError and fall back to a single
  * "other" warning (see runner.ts), matching server/src/pipeline/run.ts.
@@ -152,5 +153,5 @@ export async function verifyRecipe(
     throw new VerificationError("The verifier model did not return a parseable result.");
   }
 
-  return ensureAmountWarnings(recipe, response.parsed_output.warnings);
+  return finalizeWarnings(recipe, response.parsed_output.warnings);
 }

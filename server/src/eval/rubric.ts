@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { WarningKind } from "@recipe/shared";
 
 // eval/cases/<name>/expected.json — a rubric, not an exact recipe. Wording varies run to
 // run, so we check the things that matter: the right ingredients with the right amounts,
@@ -41,5 +42,11 @@ export const Rubric = z.object({
   // Each entry: keywords, at least one of which must appear in some warning's
   // message/suggestion/target-ingredient name.
   mustWarnAbout: z.array(z.array(z.string())),
+  // False alarms: no warning of one of these kinds may mention any of these keywords
+  // (in its message, suggestion, or targeted ingredient). E.g. an "unused_ingredient"
+  // warning about oil that a step clearly uses.
+  mustNotWarn: z
+    .array(z.object({ kinds: z.array(WarningKind), about: z.array(z.string()) }))
+    .default([]),
 });
 export type Rubric = z.infer<typeof Rubric>;

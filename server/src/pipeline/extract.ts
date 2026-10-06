@@ -1,6 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
-import { ExtractedRecipe, type Transcript } from "@recipe/shared";
+import { ExtractedRecipe, type Transcript, normalizeExtractedRecipe } from "@recipe/shared";
 import { CLAUDE_BACKEND, EXTRACTOR_EFFORT, EXTRACTOR_MODEL } from "../config.ts";
 import { callClaudeCli } from "../llm/claudeCli.ts";
 import { recordUsage } from "../llm/usage.ts";
@@ -18,6 +18,10 @@ export class ExtractionError extends Error {}
  * failure fails the whole job (unlike verification).
  */
 export async function extractRecipe(transcript: Transcript): Promise<ExtractedRecipe> {
+  return normalizeExtractedRecipe(await extractRecipeRaw(transcript));
+}
+
+async function extractRecipeRaw(transcript: Transcript): Promise<ExtractedRecipe> {
   if (transcript.segments.length === 0) {
     throw new ExtractionError("Transcript has no segments — nothing to extract a recipe from.");
   }

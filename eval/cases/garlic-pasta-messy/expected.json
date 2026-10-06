@@ -114,5 +114,20 @@
       "olive oil",
       "glug"
     ]
+  ],
+  "mustNotWarn": [
+    {
+      "kinds": [
+        "unused_ingredient",
+        "unsupported"
+      ],
+      "about": [
+        "garlic",
+        "butter",
+        "spaghetti",
+        "parsley",
+        "olive oil"
+      ]
+    }
   ]
 }

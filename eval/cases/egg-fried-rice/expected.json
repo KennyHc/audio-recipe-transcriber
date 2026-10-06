@@ -1,23 +1,112 @@
 {
   "description": "Real YouTube cooking video (~7 min). Long tasting/sign-off tail, a chili-oil plug, optional seasonings the cook skips, and a passage Whisper transcribed twice (the extra 2 tbsp oil must not be duplicated).",
-  "titleKeywords": ["egg", "fried rice"],
+  "titleKeywords": [
+    "egg",
+    "fried rice"
+  ],
   "servings": 4,
   "ingredients": [
-    { "item": "egg", "quantity": 4, "unit": null, "confidence": ["stated"] },
-    { "item": "green onion", "aliases": ["scallion", "spring onion"], "quantity": 4, "unit": null },
-    { "item": "rice", "quantity": null, "confidence": ["inferred", "vague"], "note": "Cold/day-old; amount never stated" },
-    { "item": "oil", "quantity": 1, "unit": "tbsp", "note": "For the eggs" },
-    { "item": "oil", "quantity": 2, "unit": "tbsp", "note": "Added with the rice" },
-    { "item": "soy sauce", "quantity": 2, "unit": "tbsp", "confidence": ["stated"] },
-    { "item": "salt", "confidence": ["vague", "stated"], "note": "A little pinch; used twice, one or two entries both fine" }
+    {
+      "item": "egg",
+      "quantity": 4,
+      "unit": null,
+      "confidence": [
+        "stated"
+      ]
+    },
+    {
+      "item": "green onion",
+      "aliases": [
+        "scallion",
+        "spring onion"
+      ],
+      "quantity": 4,
+      "unit": null
+    },
+    {
+      "item": "rice",
+      "quantity": null,
+      "confidence": [
+        "inferred",
+        "vague"
+      ],
+      "note": "Cold/day-old; amount never stated"
+    },
+    {
+      "item": "oil",
+      "quantity": 1,
+      "unit": "tbsp",
+      "note": "For the eggs"
+    },
+    {
+      "item": "oil",
+      "quantity": 2,
+      "unit": "tbsp",
+      "note": "Added with the rice"
+    },
+    {
+      "item": "soy sauce",
+      "quantity": 2,
+      "unit": "tbsp",
+      "confidence": [
+        "stated"
+      ]
+    },
+    {
+      "item": "salt",
+      "confidence": [
+        "vague",
+        "stated"
+      ],
+      "note": "A little pinch; used twice, one or two entries both fine"
+    }
   ],
-  "forbiddenIngredients": ["ketchup", "sriracha", "black pepper", "chili oil", "cauliflower", "peanut oil", "canola"],
+  "forbiddenIngredients": [
+    "ketchup",
+    "sriracha",
+    "black pepper",
+    "chili oil",
+    "cauliflower",
+    "peanut oil",
+    "canola"
+  ],
   "stepsInOrder": [
-    ["whisk", "beat"],
-    ["scramble"],
-    ["rice"],
-    ["soy sauce"],
-    ["green onion", "scallion"]
+    [
+      "whisk",
+      "beat"
+    ],
+    [
+      "scramble"
+    ],
+    [
+      "rice"
+    ],
+    [
+      "soy sauce"
+    ],
+    [
+      "green onion",
+      "scallion"
+    ]
   ],
-  "mustWarnAbout": [["rice"]]
+  "mustWarnAbout": [
+    [
+      "rice"
+    ]
+  ],
+  "mustNotWarn": [
+    {
+      "kinds": [
+        "unused_ingredient",
+        "unsupported"
+      ],
+      "about": [
+        "oil",
+        "egg",
+        "soy sauce",
+        "green onion",
+        "scallion"
+      ]
+    }
+  ]
 }

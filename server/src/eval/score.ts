@@ -298,6 +298,18 @@ function checkMustWarnAbout(group: string[], recipe: Recipe): Check {
     : { name, pass: false, detail: "no warning mentions any of these keywords" };
 }
 
+function checkMustNotWarn(rule: { kinds: string[]; about: string[] }, recipe: Recipe): Check {
+  const name = `no false ${rule.kinds.join("/")} warning about: ${rule.about.join("|")}`;
+  const hit = recipe.warnings.find((w) => {
+    if (!rule.kinds.includes(w.kind)) return false;
+    const haystack = [w.message, w.suggestion ?? "", resolveWarningTargetText(w, recipe)].join(" ").toLowerCase();
+    return rule.about.some((kw) => haystack.includes(kw.toLowerCase()));
+  });
+  return hit
+    ? { name, pass: false, detail: `false alarm: [${hit.kind}] "${hit.message}"` }
+    : { name, pass: true, detail: "no such warning" };
+}
+
 // ---------------------------------------------------------------------------
 // Entry point
 // ---------------------------------------------------------------------------
@@ -328,6 +340,9 @@ export function scoreRecipe(recipe: Recipe, rubric: Rubric): CaseScore {
 
   for (const group of rubric.mustWarnAbout) {
     checks.push(checkMustWarnAbout(group, recipe));
+  }
+  for (const rule of rubric.mustNotWarn) {
+    checks.push(checkMustNotWarn(rule, recipe));
   }
 
   const passed = checks.filter((c) => c.pass).length;
