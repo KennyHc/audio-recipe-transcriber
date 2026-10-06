@@ -63,8 +63,9 @@ A running list of things deliberately deferred while launching. Live today:
 
 ## Maintenance
 
-- [ ] **Dependency hygiene**: npm's optional-dependency bug has twice dropped native binaries
-      (esbuild/rollup/lightningcss). If builds fail with "Cannot find module …-darwin-arm64",
-      delete `node_modules` + `package-lock.json` and reinstall. CI will catch it once it exists.
-- [ ] **wrangler** is pinned at 4.145.0 (4.146.0's tarball 404'd on release day) — update.
+- [ ] **Dependency hygiene**: npm's optional-dependency bug can leave a package's native
+      binaries out of package-lock.json (it hid lightningcss's Linux binary until CI failed).
+      If a build fails with "Cannot find module …lightningcss…/…rollup…/…esbuild…", regenerate:
+      `rm -rf node_modules */node_modules package-lock.json && npm install`, and commit the lockfile.
+- [x] **wrangler** updated (now resolves to 4.147.x).
 - [ ] **Key rotation**: new Console key → `npx wrangler secret put ANTHROPIC_API_KEY` → delete old key.

@@ -56,7 +56,9 @@ describe("storage", () => {
     });
 
     it("saves and updates a job", async () => {
-      const now = new Date().toISOString();
+      // A fixed past timestamp, so updateJob's fresh updatedAt is always different
+      // (a 1 ms sleep wasn't enough — both could land in the same millisecond).
+      const now = "2026-01-01T00:00:00.000Z";
       const job: Job = {
         id: testJobId,
         fileName: "test.mp3",
@@ -68,9 +70,6 @@ describe("storage", () => {
       };
 
       await createJob(job);
-
-      // Add a small delay to ensure updatedAt is different
-      await new Promise((resolve) => setTimeout(resolve, 1));
 
       const updated = await updateJob(testJobId, {
         status: "done",
