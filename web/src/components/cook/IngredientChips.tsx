@@ -38,7 +38,7 @@ export function IngredientChips({
             data-checked={isChecked}
             aria-pressed={isChecked}
             className={cn(
-              "inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium tabular-nums transition-colors",
+              "inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-medium tabular-nums transition-colors",
               isChecked
                 ? "border-transparent bg-[hsl(var(--sunken))] text-[hsl(var(--ink-faint))]"
                 : "border-[hsl(var(--border-strong))] bg-[hsl(var(--accent-tint))] text-[hsl(var(--accent-text))]",

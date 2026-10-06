@@ -12,7 +12,7 @@ export function TipsList({
   if (tips.length === 0) return null;
 
   return (
-    <div className="space-y-2 pt-2">
+    <div className="rounded-[10px] bg-[hsl(var(--accent-tint)/0.5)] px-4 py-3.5 space-y-2.5">
       <h3 className="flex items-center gap-2 text-[12px] font-medium uppercase tracking-[0.08em] text-[hsl(var(--ink-muted))]">
         <Lightbulb className="h-3.5 w-3.5" />
         Notes

@@ -56,10 +56,10 @@ export function UploadZone({ onUploaded }: { onUploaded: () => void }) {
           if (file) startUpload(file);
         }}
         className={cn(
-          "rounded-[10px] border-2 border-dashed px-5 py-5 transition-colors cursor-pointer",
+          "group flex min-h-[120px] sm:min-h-[132px] items-center rounded-[12px] border-2 border-dashed px-4 py-4 transition-colors cursor-pointer",
           dragging
             ? "border-[hsl(var(--accent-fill))] bg-[hsl(var(--accent-tint))]"
-            : "border-[hsl(var(--border-strong))] bg-[hsl(var(--surface))] hover:border-[hsl(var(--accent-fill))]/60",
+            : "border-[hsl(var(--border-strong))] bg-[hsl(var(--surface))] hover:border-[hsl(var(--accent-fill))]/60 hover:bg-[hsl(var(--accent-tint))]/40",
         )}
         role="button"
         tabIndex={0}
@@ -80,10 +80,12 @@ export function UploadZone({ onUploaded }: { onUploaded: () => void }) {
           }}
         />
         {progress !== null ? (
-          <div className="flex items-center gap-3">
-            <Loader2 className="h-5 w-5 shrink-0 animate-spin text-[hsl(var(--accent-text))]" />
-            <div className="flex-1 space-y-1.5">
-              <p className="text-sm text-[hsl(var(--ink-muted))]">
+          <div className="flex w-full flex-col items-center gap-2 text-center">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[hsl(var(--accent-tint))]">
+              <Loader2 className="h-4 w-4 animate-spin text-[hsl(var(--accent-text))]" />
+            </span>
+            <div className="w-full max-w-xs space-y-1.5">
+              <p className="text-xs text-[hsl(var(--ink-muted))]">
                 Uploading… {Math.round(progress * 100)}%
               </p>
               <div className="h-1.5 w-full rounded-full bg-[hsl(var(--sunken))] overflow-hidden">
@@ -95,16 +97,13 @@ export function UploadZone({ onUploaded }: { onUploaded: () => void }) {
             </div>
           </div>
         ) : (
-          <div className="flex items-center gap-3">
-            <UploadCloud className="h-5 w-5 shrink-0 text-[hsl(var(--accent-text))]" />
-            <p className="text-sm">
-              <span className="font-medium text-[hsl(var(--ink))]">
-                Drop an audio file or browse
-              </span>
-              <span className="text-[hsl(var(--ink-faint))]">
-                {" "}
-                — mp3, m4a, wav, webm, ogg, mp4, aac, flac
-              </span>
+          <div className="flex w-full flex-col items-center gap-2 text-center">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[hsl(var(--accent-tint))] text-[hsl(var(--accent-text))] transition-colors group-hover:bg-[hsl(var(--accent-tint-strong))]">
+              <UploadCloud className="h-4 w-4" />
+            </span>
+            <p className="text-sm font-medium text-[hsl(var(--ink))]">Drop a cooking clip here</p>
+            <p className="max-w-[26ch] text-balance text-xs text-[hsl(var(--ink-faint))]">
+              MP3, M4A, WAV and more · up to 200 MB
             </p>
           </div>
         )}

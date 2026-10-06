@@ -38,7 +38,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import type { UnitSystem } from "@/lib/units";
 import { recipeToMarkdown } from "@/lib/markdown";
-import { formatDuration } from "@/lib/format";
+import { formatDuration, formatTimestamp } from "@/lib/format";
 import {
   ArrowLeft,
   Pencil,
@@ -165,6 +165,7 @@ export function JobPage({ jobId, cookRoute }: { jobId: string; cookRoute: boolea
   const [copyOk, setCopyOk] = useState(false);
 
   const [currentTime, setCurrentTime] = useState<number | null>(null);
+  const [audioDuration, setAudioDuration] = useState<number | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [pollKey, setPollKey] = useState(0);
   const [progress, setProgress] = useState<JobProgress | null>(null);
@@ -282,6 +283,21 @@ export function JobPage({ jobId, cookRoute }: { jobId: string; cookRoute: boolea
     const onTime = () => setCurrentTime(el.currentTime);
     el.addEventListener("timeupdate", onTime);
     return () => el.removeEventListener("timeupdate", onTime);
+  }, [job?.status]);
+
+  // Track audio duration for the header's quiet stats line — no extra request, just
+  // reading metadata off the same hidden <audio> element the player already drives.
+  useEffect(() => {
+    const el = audioRef.current;
+    if (!el) return;
+    const onDuration = () => setAudioDuration(Number.isFinite(el.duration) ? el.duration : null);
+    el.addEventListener("durationchange", onDuration);
+    el.addEventListener("loadedmetadata", onDuration);
+    onDuration();
+    return () => {
+      el.removeEventListener("durationchange", onDuration);
+      el.removeEventListener("loadedmetadata", onDuration);
+    };
   }, [job?.status]);
 
   function seekTo(seconds: number) {
@@ -520,8 +536,14 @@ export function JobPage({ jobId, cookRoute }: { jobId: string; cookRoute: boolea
               onSave={handleSave}
             />
           ) : (
-            <>
-              <div className="print-area space-y-4">
+            <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "recipe" | "transcript")}>
+              <div
+                className="print-area relative overflow-hidden rounded-[14px] border border-[hsl(var(--border))] px-5 pt-6 print:pb-6 sm:px-7 sm:pt-7 sm:print:pb-7 space-y-4"
+                style={{
+                  backgroundImage:
+                    "radial-gradient(80% 140% at 100% -20%, hsl(var(--accent-fill) / 0.08), transparent 70%), radial-gradient(50% 90% at 88% 0%, hsl(var(--accent-fill) / 0.06), transparent 75%), linear-gradient(180deg, hsl(var(--accent-tint) / 0.4), hsl(var(--background)))",
+                }}
+              >
                 <div className="flex flex-wrap items-start justify-between gap-4">
                   <div className="space-y-2 max-w-[65ch]">
                     <h1 className="font-serif text-[34px] sm:text-[44px] leading-[1.05] tracking-[-0.01em] text-[hsl(var(--ink))]">
@@ -530,6 +552,15 @@ export function JobPage({ jobId, cookRoute }: { jobId: string; cookRoute: boolea
                     {displayedRecipe.description && (
                       <p className="text-[hsl(var(--ink-muted))]">{displayedRecipe.description}</p>
                     )}
+                    <p className="text-xs tabular-nums text-[hsl(var(--ink-faint))]">
+                      {[
+                        `${displayedRecipe.ingredients.length} ingredient${displayedRecipe.ingredients.length === 1 ? "" : "s"}`,
+                        `${displayedRecipe.steps.length} step${displayedRecipe.steps.length === 1 ? "" : "s"}`,
+                        audioDuration !== null ? `${formatTimestamp(audioDuration)} audio` : null,
+                      ]
+                        .filter(Boolean)
+                        .join(" · ")}
+                    </p>
                   </div>
 
                   <div className="no-print flex items-center gap-2 shrink-0">
@@ -587,54 +618,55 @@ export function JobPage({ jobId, cookRoute }: { jobId: string; cookRoute: boolea
                 </div>
 
                 <div className="no-print flex flex-wrap items-center gap-2">
-                  <ServingsScaler
-                    originalServings={displayedRecipe.servings}
-                    factor={scaleFactor}
-                    onFactorChange={setScaleFactor}
-                  />
+                  <div className="inline-flex flex-wrap items-center gap-1.5">
+                    <ServingsScaler
+                      originalServings={displayedRecipe.servings}
+                      factor={scaleFactor}
+                      onFactorChange={setScaleFactor}
+                    />
+                    <UnitsToggle value={unitSystem} onChange={setUnitSystem} />
+                  </div>
                   {displayedRecipe.totalTimeMinutes !== null && (
                     <span className="inline-flex items-center gap-1.5 rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--sunken))] px-3 py-1 text-sm text-[hsl(var(--ink-muted))]">
                       <Clock className="h-3.5 w-3.5" /> {formatDuration(displayedRecipe.totalTimeMinutes)}
                     </span>
                   )}
-                  <UnitsToggle value={unitSystem} onChange={setUnitSystem} />
                 </div>
                 {displayedRecipe.totalTimeMinutes !== null && (
                   <p className="hidden print:block text-sm text-[hsl(var(--ink-muted))]">
                     Total time: {formatDuration(displayedRecipe.totalTimeMinutes)}
                   </p>
                 )}
-              </div>
 
-              <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "recipe" | "transcript")}>
-                <TabsList className="no-print">
+                <TabsList className="no-print flex -mx-5 sm:-mx-7 mt-2 border-b-0 border-t border-[hsl(var(--border))] px-5 pt-1 sm:px-7">
                   <TabsTrigger value="recipe">Recipe</TabsTrigger>
                   <TabsTrigger value="transcript" disabled={!transcript}>
                     Transcript
                   </TabsTrigger>
                 </TabsList>
-                <TabsContent value="recipe">
-                  <RecipeView
-                    recipe={displayedRecipe}
-                    unitSystem={unitSystem}
-                    scaleFactor={scaleFactor}
-                    onSeek={seekTo}
+              </div>
+
+              <TabsContent value="recipe">
+                <RecipeView
+                  recipe={displayedRecipe}
+                  unitSystem={unitSystem}
+                  scaleFactor={scaleFactor}
+                  onSeek={seekTo}
+                  currentTime={currentTime}
+                  checkedIngredients={checkedIngredients}
+                  onToggleIngredient={toggleIngredient}
+                />
+              </TabsContent>
+              <TabsContent value="transcript">
+                {transcript && (
+                  <TranscriptView
+                    transcript={transcript}
                     currentTime={currentTime}
-                    checkedIngredients={checkedIngredients}
-                    onToggleIngredient={toggleIngredient}
+                    onSeek={seekTo}
                   />
-                </TabsContent>
-                <TabsContent value="transcript">
-                  {transcript && (
-                    <TranscriptView
-                      transcript={transcript}
-                      currentTime={currentTime}
-                      onSeek={seekTo}
-                    />
-                  )}
-                </TabsContent>
-              </Tabs>
-            </>
+                )}
+              </TabsContent>
+            </Tabs>
           )}
 
           <VersionHistory

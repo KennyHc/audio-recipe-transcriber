@@ -16,7 +16,7 @@ export default function App() {
   return (
     <TooltipProvider delayDuration={200}>
       <div className="min-h-screen flex flex-col">
-        <header className="no-print border-b border-[hsl(var(--border))] bg-[hsl(var(--surface))]">
+        <header className="no-print sticky top-0 z-40 border-b border-[hsl(var(--border))] bg-[hsl(var(--surface)/0.75)] backdrop-blur-md">
           <div className="mx-auto max-w-[1120px] px-4 py-2.5 flex items-center justify-between gap-2">
             <a href="#/" className="flex items-center gap-2.5 group">
               <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[9px] bg-[hsl(var(--accent-tint))] text-[hsl(var(--accent-text))]">

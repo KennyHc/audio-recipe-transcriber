@@ -37,30 +37,42 @@ export function IngredientList({
         const targetWarnings = warnings.filter((w) => w.target === `ingredients[${i}]`);
         const isChecked = checked.has(i);
 
+        const flagged = targetWarnings.length > 0;
+
         return (
           <li
             id={`ingredient-${i}`}
             key={i}
             className={cn(
-              "checkbox-row flex items-start gap-3 rounded-md px-2 py-2 transition-colors scroll-mt-24",
-              targetWarnings.length > 0 && "bg-[hsl(var(--caution-tint))]",
+              "checkbox-row group flex items-start gap-3 rounded-[10px] px-2 py-2 transition-colors scroll-mt-24",
+              flagged
+                ? "bg-[hsl(var(--caution-tint))]/60 border-l-2 border-l-[hsl(var(--caution-border))] pl-[6px]"
+                : "hover:bg-[hsl(var(--sunken))]",
             )}
           >
             <Checkbox checked={isChecked} onChange={() => toggle(i)} ariaLabel={`Mark ${ing.item} as done`} className="mt-1" />
             <div className="flex-1 min-w-0">
-              <label
-                className={cn("checkbox-strike block max-w-[70ch] text-sm sm:text-base cursor-pointer")}
-                onClick={() => toggle(i)}
-              >
-                {qtyLabel && <span className="font-semibold tabular-nums">{qtyLabel} </span>}
-                {unitLabel && <span className="font-semibold">{unitLabel} </span>}
-                <span>{ing.item}</span>
-                {ing.prep && <span className="text-[hsl(var(--muted-foreground))]">, {ing.prep}</span>}
-              </label>
-              <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                <StatusPill confidence={ing.confidence} sourceText={ing.sourceText} warnings={targetWarnings} />
-                <TimestampButton seconds={ing.timestamp} onSeek={onSeek} />
+              <div className="flex items-baseline justify-between gap-3">
+                <label
+                  className={cn("checkbox-strike block min-w-0 max-w-[70ch] text-sm sm:text-base cursor-pointer")}
+                  onClick={() => toggle(i)}
+                >
+                  {qtyLabel && <span className="font-semibold tabular-nums">{qtyLabel} </span>}
+                  {unitLabel && <span className="font-semibold">{unitLabel} </span>}
+                  <span>{ing.item}</span>
+                  {ing.prep && <span className="text-[hsl(var(--muted-foreground))]">, {ing.prep}</span>}
+                </label>
+                <TimestampButton
+                  seconds={ing.timestamp}
+                  onSeek={onSeek}
+                  className="shrink-0 text-[hsl(var(--ink-faint))] group-hover:text-[hsl(var(--accent-text))]"
+                />
               </div>
+              {targetWarnings.length > 0 || (ing.confidence && ing.confidence !== "stated") ? (
+                <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                  <StatusPill confidence={ing.confidence} sourceText={ing.sourceText} warnings={targetWarnings} />
+                </div>
+              ) : null}
             </div>
           </li>
         );

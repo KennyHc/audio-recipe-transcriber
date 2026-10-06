@@ -25,6 +25,16 @@
   --accent-tint: 209 84% 95%;
   --accent-tint-strong: 208 81% 90%;
 
+  /* Primary button fill — a deeper, richer blue than --accent-fill so white text on
+     top of the gradient clears 4.5:1 contrast at every point, not just on average. */
+  --primary-from: 207 75% 44%;
+  --primary-to: 211 73% 38%;
+  --primary-ink: 0 0% 100%;
+  --shadow-primary: inset 0 1px 0 0 rgb(255 255 255 / 0.22), 0 1px 2px rgb(15 27 45 / 0.08),
+    0 10px 24px -10px hsl(var(--primary-to) / 0.5);
+  --shadow-primary-hover: inset 0 1px 0 0 rgb(255 255 255 / 0.28), 0 1px 2px rgb(15 27 45 / 0.1),
+    0 14px 28px -10px hsl(var(--primary-to) / 0.55);
+
   /* Caution (vague / warnings) — light blue per DESIGN.md, no yellow/amber */
   --caution-tint: 208 83% 95%;
   --caution-border: 208 78% 86%;
@@ -75,6 +85,20 @@
   --accent-tint: 212 54% 15%;
   --accent-tint-strong: 212 51% 22%;
 
+  /* Primary button fill in dark mode: a light fill with DARK ink reads much better
+     than white-on-light-blue, which is how the old single-tone accent button failed
+     contrast here. */
+  --primary-from: 205 81% 68%;
+  --primary-to: 207 75% 61%;
+  --primary-ink: 220 49% 8%;
+  /* Neutral (uncolored) shadow — a saturated glow in the tint color read as a blurry
+     halo around primary buttons on a dark background, so this stays a plain, subtle
+     drop shadow like the rest of the UI's floating elements. */
+  --shadow-primary: inset 0 1px 0 0 rgb(255 255 255 / 0.25), 0 1px 2px rgb(0 0 0 / 0.3),
+    0 4px 10px -4px rgb(0 0 0 / 0.4);
+  --shadow-primary-hover: inset 0 1px 0 0 rgb(255 255 255 / 0.3), 0 1px 2px rgb(0 0 0 / 0.35),
+    0 6px 14px -4px rgb(0 0 0 / 0.45);
+
   --caution-tint: 211 57% 15%;
   --caution-border: 209 55% 26%;
   --caution-text: 208 78% 78%;
@@ -105,6 +129,14 @@
     --accent-tint: 212 54% 15%;
     --accent-tint-strong: 212 51% 22%;
 
+    --primary-from: 205 81% 68%;
+    --primary-to: 207 75% 61%;
+    --primary-ink: 220 49% 8%;
+    --shadow-primary: inset 0 1px 0 0 rgb(255 255 255 / 0.25), 0 1px 2px rgb(0 0 0 / 0.3),
+      0 4px 10px -4px rgb(0 0 0 / 0.4);
+    --shadow-primary-hover: inset 0 1px 0 0 rgb(255 255 255 / 0.3), 0 1px 2px rgb(0 0 0 / 0.35),
+      0 6px 14px -4px rgb(0 0 0 / 0.45);
+
     --caution-tint: 211 57% 15%;
     --caution-border: 209 55% 26%;
     --caution-text: 208 78% 78%;
@@ -123,6 +155,20 @@
 @layer base {
   * {
     border-color: hsl(var(--border));
+  }
+
+  /* Better line breaks by default: headings balance across lines (no lonely last
+     word on a wide heading), body text and list items avoid very short last lines
+     (e.g. "cold (day-" / "old)"). Any element can opt out with text-wrap-* utilities. */
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
+  }
+
+  p,
+  li {
+    text-wrap: pretty;
   }
 }
 
@@ -278,14 +324,23 @@ body {
    stroke-dashoffset transition off of. */
 .chip-checkmark {
   display: inline-flex;
+  width: 0;
+  margin-right: 0;
+  overflow: hidden;
   transform: scale(0.5);
   opacity: 0;
   transition:
+    width 180ms ease-out,
+    margin-right 180ms ease-out,
     transform 180ms ease-out,
     opacity 150ms ease-out;
 }
 
+/* Only reserve the checkmark's width once it's actually shown — otherwise unchecked
+   chips were left with a permanent blank slot on the left. */
 [data-checked="true"] .chip-checkmark {
+  width: 0.75rem;
+  margin-right: 0.25rem;
   transform: scale(1);
   opacity: 1;
 }
@@ -302,6 +357,8 @@ body {
     padding: 0 !important;
     margin: 0 !important;
     color: black !important;
+    background: transparent !important;
+    border: none !important;
   }
   .print-area * {
     color: black !important;

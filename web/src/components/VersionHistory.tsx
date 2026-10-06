@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { formatRelativeTime } from "@/lib/format";
+import { formatFriendlyDate } from "@/lib/format";
 import { History as HistoryIcon, RotateCcw, Eye } from "lucide-react";
 
 const SOURCE_LABEL: Record<VersionSource, string> = {
@@ -85,7 +85,7 @@ export function VersionHistory({
               return (
                 <li
                   key={v.version}
-                  className="flex items-center gap-3 rounded-md border border-[hsl(var(--border))] px-3 py-2"
+                  className="flex items-center gap-3 rounded-[10px] border border-[hsl(var(--border))] px-3 py-2 transition-colors hover:border-[hsl(var(--border-strong))]"
                 >
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium flex items-center gap-2">
@@ -94,7 +94,7 @@ export function VersionHistory({
                       {isCurrent && <Badge>Current</Badge>}
                     </p>
                     <p className="text-xs text-[hsl(var(--muted-foreground))]">
-                      {formatRelativeTime(v.createdAt)}
+                      {formatFriendlyDate(v.createdAt)}
                       {v.note ? ` — ${v.note}` : ""}
                     </p>
                   </div>

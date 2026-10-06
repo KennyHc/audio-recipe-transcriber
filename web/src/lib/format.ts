@@ -101,6 +101,24 @@ export function formatUnit(unit: string | null | undefined, quantity: number | n
   return plural ?? unit;
 }
 
+const FRIENDLY_DATE_FORMAT = new Intl.DateTimeFormat(undefined, {
+  month: "short",
+  day: "numeric",
+  year: "numeric",
+});
+
+/** Friendly absolute date, e.g. "Sep 26, 2026", with "Today"/"Yesterday" for recent days. */
+export function formatFriendlyDate(iso: string): string {
+  const then = new Date(iso);
+  if (Number.isNaN(then.getTime())) return iso;
+
+  const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  const diffDays = Math.round((startOfDay(new Date()) - startOfDay(then)) / 86_400_000);
+  if (diffDays === 0) return "Today";
+  if (diffDays === 1) return "Yesterday";
+  return FRIENDLY_DATE_FORMAT.format(then);
+}
+
 /** Relative time label, e.g. "2 hours ago", "just now". */
 export function formatRelativeTime(iso: string): string {
   const then = new Date(iso).getTime();

@@ -109,20 +109,20 @@ export function EditRecipe({
   return (
     <div className="space-y-6">
       <div className="space-y-3">
-        <div>
-          <label className="text-sm font-medium">Title</label>
+        <div className="space-y-1">
+          <label className="text-sm font-medium text-[hsl(var(--ink))]">Title</label>
           <Input value={draft.title} onChange={(e) => set("title", e.target.value)} />
         </div>
-        <div>
-          <label className="text-sm font-medium">Description</label>
+        <div className="space-y-1">
+          <label className="text-sm font-medium text-[hsl(var(--ink))]">Description</label>
           <Textarea
             value={draft.description ?? ""}
             onChange={(e) => set("description", e.target.value || null)}
           />
         </div>
         <div className="flex gap-4">
-          <div>
-            <label className="text-sm font-medium">Servings</label>
+          <div className="space-y-1">
+            <label className="text-sm font-medium text-[hsl(var(--ink))]">Servings</label>
             <Input
               type="number"
               min={0}
@@ -133,8 +133,8 @@ export function EditRecipe({
               className="w-28"
             />
           </div>
-          <div>
-            <label className="text-sm font-medium">Total time (min)</label>
+          <div className="space-y-1">
+            <label className="text-sm font-medium text-[hsl(var(--ink))]">Total time (min)</label>
             <Input
               type="number"
               min={0}
@@ -149,12 +149,14 @@ export function EditRecipe({
       </div>
 
       <section className="space-y-2">
-        <h3 className="font-medium">Ingredients</h3>
+        <h3 className="text-[12px] font-medium uppercase tracking-[0.08em] text-[hsl(var(--ink-muted))]">
+          Ingredients
+        </h3>
         <div className="space-y-2">
           {draft.ingredients.map((ing, i) => (
             <div
               key={i}
-              className="grid grid-cols-[5rem_5rem_1fr_1fr_auto] gap-2 items-start rounded-md border border-[hsl(var(--border))] p-2"
+              className="grid grid-cols-[5rem_5rem_1fr_1fr_auto] gap-2 items-start rounded-[10px] border border-[hsl(var(--border))] p-2 transition-colors hover:border-[hsl(var(--border-strong))]"
             >
               <Input
                 aria-label="Quantity"
@@ -266,12 +268,14 @@ export function EditRecipe({
       </section>
 
       <section className="space-y-2">
-        <h3 className="font-medium">Steps</h3>
+        <h3 className="text-[12px] font-medium uppercase tracking-[0.08em] text-[hsl(var(--ink-muted))]">
+          Steps
+        </h3>
         <div className="space-y-2">
           {draft.steps.map((step, i) => (
             <div
               key={i}
-              className="flex gap-2 items-start rounded-md border border-[hsl(var(--border))] p-2"
+              className="flex gap-2 items-start rounded-[10px] border border-[hsl(var(--border))] p-2 transition-colors hover:border-[hsl(var(--border-strong))]"
             >
               <span className="mt-2 text-sm font-semibold text-[hsl(var(--muted-foreground))]">
                 {i + 1}
@@ -333,10 +337,15 @@ export function EditRecipe({
       </section>
 
       <section className="space-y-2">
-        <h3 className="font-medium">Tips</h3>
+        <h3 className="text-[12px] font-medium uppercase tracking-[0.08em] text-[hsl(var(--ink-muted))]">
+          Tips
+        </h3>
         <div className="space-y-2">
           {draft.tips.map((tip, i) => (
-            <div key={i} className="flex gap-2 items-start rounded-md border border-[hsl(var(--border))] p-2">
+            <div
+              key={i}
+              className="flex gap-2 items-start rounded-[10px] border border-[hsl(var(--border))] p-2 transition-colors hover:border-[hsl(var(--border-strong))]"
+            >
               <Input
                 aria-label={`Tip ${i + 1}`}
                 value={tip.text}
@@ -364,7 +373,10 @@ export function EditRecipe({
         </Button>
       </section>
 
-      <div className="no-print sticky bottom-16 flex justify-end gap-2 rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-3 shadow-md">
+      <div
+        className="no-print sticky bottom-16 flex justify-end gap-2 rounded-[10px] border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-3"
+        style={{ boxShadow: "var(--shadow-float)" }}
+      >
         <Button variant="outline" onClick={onCancel} disabled={saving}>
           <X className="h-4 w-4" /> Cancel
         </Button>

@@ -38,16 +38,20 @@ export function StepsList({
             id={`step-${i}`}
             key={i}
             className={cn(
-              "flex gap-4 sm:gap-5 border-t border-[hsl(var(--border))] py-7 sm:py-8 first:border-t-0 first:pt-0 transition-colors scroll-mt-24",
-              highlighted && "rounded-[10px] border-t-transparent -mx-3 sm:-mx-4 px-3 sm:px-4",
+              // The divider is a pseudo-element inset to the column edges, so it lines up with
+              // the rest of the page even though the row bleeds out for its hover background.
+              "relative flex gap-3 sm:gap-4 rounded-[10px] -mx-3 sm:-mx-4 px-3 sm:px-4 py-3 first:pt-0 transition-colors scroll-mt-24",
+              "before:absolute before:top-0 before:inset-x-3 sm:before:inset-x-4 before:h-px before:bg-[hsl(var(--border))] first:before:hidden",
+              highlighted && "before:hidden",
               targetWarnings.length > 0 && "bg-[hsl(var(--caution-tint))]",
               isActive && "bg-[hsl(var(--accent-tint))] border-l-2 border-l-[hsl(var(--accent-fill))]",
+              !highlighted && "hover:bg-[hsl(var(--sunken))]",
             )}
           >
-            <span className="w-8 sm:w-10 shrink-0 text-right font-serif text-[26px] sm:text-[28px] leading-none text-[hsl(var(--accent-text))]">
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[hsl(var(--accent-tint-strong))] font-sans text-[14px] font-semibold tabular-nums leading-none text-[hsl(var(--accent-text))]">
               {i + 1}
             </span>
-            <div className="flex-1 min-w-0 space-y-2 pt-1">
+            <div className="flex-1 min-w-0 space-y-1.5 pt-0.5">
               <p className="max-w-[70ch] text-[15px] sm:text-[17px] leading-[1.6]">
                 {convertTemperatureText(step.text, unitSystem)}
               </p>
