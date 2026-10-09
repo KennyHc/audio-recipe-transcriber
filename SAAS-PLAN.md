@@ -206,4 +206,4 @@ Because the domain stays on Cloudflare Pages for now, the **static site stays on
 Pages** and only the backend moves to Google Cloud (Firebase Auth, Firestore, Cloud Run).
 Moving the site to Firebase Hosting is a later, independent step tied to the branding/domain.
 
-Phase 1 build plan: see **PHASE1-PLAN.md**.
+Phase 1 build plan: see **PHASE1-PLAN.md** (live since 2026-10-09). Phase 2: **PHASE2-PLAN.md**.

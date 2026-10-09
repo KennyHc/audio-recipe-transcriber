@@ -3,6 +3,7 @@ import { Loader2, Mail, MailCheck } from "lucide-react";
 import { account } from "@/backend";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import googleLogo from "@/assets/google-g.png";
 
 /** Google sign-in and "Email me a sign-in link" — the two ways in (cloud mode). */
 export function SignInPanel() {
@@ -74,7 +75,11 @@ export function SignInPanel() {
       </div>
 
       <Button className="w-full" onClick={handleGoogle} disabled={busy !== null}>
-        {busy === "google" && <Loader2 className="h-4 w-4 animate-spin" />}
+        {busy === "google" ? (
+          <Loader2 className="h-4 w-4 animate-spin" />
+        ) : (
+          <img src={googleLogo} alt="" aria-hidden="true" width={20} height={20} className="h-5 w-5 shrink-0" />
+        )}
         Continue with Google
       </Button>
 
