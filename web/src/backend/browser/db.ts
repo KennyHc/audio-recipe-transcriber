@@ -100,7 +100,9 @@ export async function listJobs(): Promise<Job[]> {
   return jobs;
 }
 
-export async function deleteJobRecord(jobId: string): Promise<void> {
+/** Deletes a job and everything stored for it. `keepAudio` keeps the audio blob (cloud mode:
+ * once a recipe lives in the account, this device still plays its audio, keyed by the same id). */
+export async function deleteJobRecord(jobId: string, options: { keepAudio?: boolean } = {}): Promise<void> {
   const db = await getDb();
   // Look up the version keys to delete BEFORE opening the readwrite
   // transaction below: awaiting inside a transaction (across a microtask gap
@@ -111,7 +113,7 @@ export async function deleteJobRecord(jobId: string): Promise<void> {
   const tx = db.transaction(["jobs", "audio", "transcripts", "versions"], "readwrite");
   await Promise.all([
     tx.objectStore("jobs").delete(jobId),
-    tx.objectStore("audio").delete(jobId),
+    ...(options.keepAudio ? [] : [tx.objectStore("audio").delete(jobId)]),
     tx.objectStore("transcripts").delete(jobId),
     ...versionKeys.map((key) => tx.objectStore("versions").delete(key)),
     tx.done,
@@ -125,6 +127,11 @@ export async function deleteJobRecord(jobId: string): Promise<void> {
 export async function saveAudio(jobId: string, fileName: string, blob: Blob): Promise<void> {
   const db = await getDb();
   await db.put("audio", { jobId, fileName, blob });
+}
+
+export async function deleteAudio(jobId: string): Promise<void> {
+  const db = await getDb();
+  await db.delete("audio", jobId);
 }
 
 export async function getAudio(jobId: string): Promise<AudioRecord | null> {
@@ -209,10 +216,10 @@ export async function getLatestVersion(jobId: string): Promise<VersionedRecipe |
   return getVersion(jobId, Math.max(...numbers));
 }
 
-/** Test-only: closes the current connection (if any) and forces a fresh one
- * on the next getDb() call — needed so a following indexedDB.deleteDatabase()
- * doesn't block forever waiting for this connection to close. */
-export async function _resetDbConnectionForTests(): Promise<void> {
+/** Closes the current connection (if any) and forces a fresh one on the next getDb() call —
+ * needed so a following indexedDB.deleteDatabase() doesn't block waiting for this connection
+ * to close (tests, and cloud mode's account deletion). */
+export async function closeDbConnection(): Promise<void> {
   const previous = dbPromise;
   dbPromise = null;
   if (previous) {
@@ -224,3 +231,6 @@ export async function _resetDbConnectionForTests(): Promise<void> {
     }
   }
 }
+
+/** Test-only alias of closeDbConnection(). */
+export const _resetDbConnectionForTests = closeDbConnection;

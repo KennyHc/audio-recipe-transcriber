@@ -23,6 +23,7 @@ import {
   DialogClose,
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
+import { useAudioAvailable } from "@/lib/audioAvailability";
 
 /** Plays a short, gentle two-note chime with the Web Audio API — no audio files. */
 function playChime() {
@@ -444,6 +445,7 @@ function StepSlide({
   onToggleHear: () => void;
   onStartTimer: () => void;
 }) {
+  const audioAvailable = useAudioAvailable();
   return (
     <div className="space-y-5">
       <p className="text-xs font-medium uppercase tracking-[0.08em] text-[hsl(var(--ink-muted))]">
@@ -476,7 +478,7 @@ function StepSlide({
       </div>
 
       <div className="flex flex-wrap items-center gap-3 pt-1">
-        {step.timestamp !== null && (
+        {step.timestamp !== null && audioAvailable && (
           <Button variant="outline" onClick={onToggleHear}>
             {isHearingThis ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
             {isHearingThis ? "Stop" : "Hear this step"}

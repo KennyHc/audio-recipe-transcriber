@@ -1,12 +1,18 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { Play, Pause, RotateCcw, RotateCw } from "lucide-react";
-import { backend } from "@/backend";
+import { AudioNotOnDeviceError, backend } from "@/backend";
 import { formatTimestamp } from "@/lib/format";
 
 export const AudioPlayer = forwardRef<
   HTMLAudioElement,
-  { jobId: string; title: string; activeStepText?: string | null }
->(function AudioPlayer({ jobId, title, activeStepText }, forwardedRef) {
+  {
+    jobId: string;
+    title: string;
+    activeStepText?: string | null;
+    /** Cloud mode: called with false when this device doesn't have the recipe's audio. */
+    onAvailabilityChange?: (available: boolean) => void;
+  }
+>(function AudioPlayer({ jobId, title, activeStepText, onAvailabilityChange }, forwardedRef) {
   const audioElRef = useRef<HTMLAudioElement | null>(null);
   useImperativeHandle(forwardedRef, () => audioElRef.current as HTMLAudioElement, []);
 
@@ -14,6 +20,9 @@ export const AudioPlayer = forwardRef<
   const [current, setCurrent] = useState(0);
   const [duration, setDuration] = useState(0);
   const [audioSrc, setAudioSrc] = useState<string | null>(null);
+  const [notOnDevice, setNotOnDevice] = useState(false);
+  const onAvailabilityRef = useRef(onAvailabilityChange);
+  onAvailabilityRef.current = onAvailabilityChange;
 
   // Resolve the audio URL (a plain server URL, or an object URL for a stored Blob in
   // browser mode). Revoke object URLs on change/unmount to avoid leaking memory.
@@ -21,15 +30,22 @@ export const AudioPlayer = forwardRef<
     let cancelled = false;
     let objectUrl: string | null = null;
     setAudioSrc(null);
+    setNotOnDevice(false);
     backend
       .getAudioUrl(jobId)
       .then((url) => {
         if (cancelled) return;
         if (url.startsWith("blob:")) objectUrl = url;
         setAudioSrc(url);
+        onAvailabilityRef.current?.(true);
       })
-      .catch(() => {
-        /* audio not available yet */
+      .catch((err: unknown) => {
+        if (cancelled) return;
+        if (err instanceof AudioNotOnDeviceError) {
+          setNotOnDevice(true);
+          onAvailabilityRef.current?.(false);
+        }
+        /* otherwise: audio not available yet */
       });
     return () => {
       cancelled = true;
@@ -83,6 +99,12 @@ export const AudioPlayer = forwardRef<
   }
 
   const progressFraction = duration > 0 ? Math.min(1, current / duration) : 0;
+
+  // No player at all when the audio lives on another device; the recipe page says so instead.
+  // The (empty) <audio> element stays so refs held by the page and cook mode remain valid.
+  if (notOnDevice) {
+    return <audio ref={audioElRef} preload="none" className="hidden" />;
+  }
 
   return (
     <div className="no-print fixed inset-x-0 bottom-3 z-30 px-3">

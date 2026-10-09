@@ -28,11 +28,26 @@ jobs:
 
       - run: npm ci
 
+      # The Firestore/Auth emulators (rules + API tests) need Java; cache the emulator jar.
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/firebase/emulators
+          key: firebase-emulators-${{ hashFiles('package-lock.json') }}
+          restore-keys: firebase-emulators-
+
       - name: Typecheck (server, web, worker)
         run: npm run typecheck
 
-      - name: Tests (server, web, worker)
+      - name: Tests (server, web, worker, api)
         run: npm test
+
+      - name: Firestore security rules (emulator)
+        run: npm run test:rules
 
       - name: Build web (local-server mode)
         run: npm run build -w web

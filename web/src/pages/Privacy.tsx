@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { ArrowLeft } from "lucide-react";
 import { backend } from "@/backend";
-import { IS_HOSTED } from "@/lib/mode";
+import { IS_CLOUD, IS_HOSTED } from "@/lib/mode";
 
 const LAST_UPDATED = "October 4, 2026";
 
@@ -28,7 +28,8 @@ function ExternalLink({ href, children }: { href: string; children: ReactNode })
 
 export function Privacy() {
   const isBrowserMode = backend.kind === "browser"; // covers both hosted and BYOK — see lib/mode.ts
-  const isByok = isBrowserMode && !IS_HOSTED;
+  const isByok = isBrowserMode && !IS_HOSTED && !IS_CLOUD;
+  const isLocalOnly = isBrowserMode && !IS_CLOUD; // BYOK and hosted: everything lives in IndexedDB
   const isLocalServer = backend.kind === "server";
 
   return (
@@ -52,7 +53,57 @@ export function Privacy() {
         recipes — in plain language, matching what the app actually does.
       </p>
 
-      {isBrowserMode && (
+      {IS_CLOUD && (
+        <>
+          <section className="space-y-2">
+            <SectionLabel>What stays on your device</SectionLabel>
+            <p className="text-[hsl(var(--ink))] leading-relaxed">
+              Your audio never leaves your device. Speech-to-text runs in your browser: the
+              speech model is downloaded from Hugging Face the first time you transcribe, cached
+              in this browser, and runs entirely on your device. The audio file is kept in this
+              browser (IndexedDB) so you can play it back from the recipe — on other devices the
+              recipe shows without audio.
+            </p>
+          </section>
+
+          <section className="space-y-2">
+            <SectionLabel>What's stored in your account</SectionLabel>
+            <p className="text-[hsl(var(--ink))] leading-relaxed">
+              When you sign in (with Google or an emailed link), we store your account's email
+              address, plus your name and profile picture if Google provides them. We also store
+              your recipes, every saved version of them, their transcripts, and a count of how
+              many recipes you've made this month (for the free limit).
+            </p>
+            <p className="text-[hsl(var(--ink))] leading-relaxed">
+              This is kept in Google Cloud Firestore in the EU (Firebase, multi-region eur3), and
+              is private: only you can read it when signed in. To keep the service from being
+              abused, sign-in and requests are checked with Firebase App Check, which uses Google
+              reCAPTCHA Enterprise.
+            </p>
+          </section>
+
+          <section className="space-y-2">
+            <SectionLabel>What's sent, and to whom</SectionLabel>
+            <p className="text-[hsl(var(--ink))] leading-relaxed">
+              To make a recipe, the transcript text is sent to our server (Google Cloud Run in the
+              EU), which sends it to Anthropic's Claude API to extract the recipe and double-check
+              it. The result is saved to your account. The audio is never uploaded.
+            </p>
+          </section>
+
+          <section className="space-y-2">
+            <SectionLabel>Download or delete anytime</SectionLabel>
+            <p className="text-[hsl(var(--ink))] leading-relaxed">
+              Settings → "Download all my data" gives you every recipe, version, and transcript as
+              one file. Settings → "Delete my account" permanently deletes your account and
+              everything in it, and clears this browser's local data. Deleting a single recipe
+              deletes its versions and transcript too.
+            </p>
+          </section>
+        </>
+      )}
+
+      {isLocalOnly && (
         <section className="space-y-2">
           <SectionLabel>What stays on your device</SectionLabel>
           <p className="text-[hsl(var(--ink))] leading-relaxed">
@@ -126,6 +177,19 @@ export function Privacy() {
             a recipe and double-check it.{" "}
             <ExternalLink href="https://www.anthropic.com/legal/privacy">Anthropic's privacy policy</ExternalLink>
           </li>
+          {IS_CLOUD && (
+            <li>
+              <strong>Google</strong> — Firebase Authentication (sign-in), Cloud Firestore (your
+              recipes, in the EU), Cloud Run (our server), and App Check with reCAPTCHA Enterprise.{" "}
+              <ExternalLink href="https://firebase.google.com/support/privacy">Firebase privacy and security</ExternalLink>
+            </li>
+          )}
+          {IS_CLOUD && (
+            <li>
+              <strong>Cloudflare</strong> — hosts this site (Pages).{" "}
+              <ExternalLink href="https://www.cloudflare.com/privacypolicy/">Cloudflare's privacy policy</ExternalLink>
+            </li>
+          )}
           {IS_HOSTED && (
             <li>
               <strong>Cloudflare</strong> — hosts this site and the small API server (Workers,
@@ -150,10 +214,11 @@ export function Privacy() {
       </section>
 
       <section className="space-y-2">
-        <SectionLabel>No accounts, no ads, no tracking</SectionLabel>
+        <SectionLabel>{IS_CLOUD ? "No ads, no tracking" : "No accounts, no ads, no tracking"}</SectionLabel>
         <p className="text-[hsl(var(--ink))] leading-relaxed">
-          There's no sign-up, no advertising, and no analytics or tracking cookies. Your theme
-          choice and settings live in this browser's local storage, not on any server.
+          {IS_CLOUD
+            ? "There's no advertising, and no analytics or tracking cookies. Your recipes are never shared or made public. Your theme choice and settings live in this browser's local storage; signing in keeps a session in this browser."
+            : "There's no sign-up, no advertising, and no analytics or tracking cookies. Your theme choice and settings live in this browser's local storage, not on any server."}
         </p>
       </section>
 

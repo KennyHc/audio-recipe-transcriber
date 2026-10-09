@@ -2,7 +2,10 @@ import { useEffect, useState, useCallback } from "react";
 import type { Job, QuotaResponse } from "@recipe/shared";
 import { backend } from "@/backend";
 import { hasApiKey } from "@/backend/settings";
-import { IS_HOSTED } from "@/lib/mode";
+import { IS_CLOUD, IS_HOSTED } from "@/lib/mode";
+import { useAccountUser } from "@/lib/useAccount";
+import { quotaExceededMessage } from "@/backend/cloud/errors";
+import { MoveLocalRecipesPrompt } from "@/components/account/MoveLocalRecipesPrompt";
 import { UploadZone } from "@/components/UploadZone";
 import { StatusBadge } from "@/components/StatusBadge";
 import { jobHref, privacyHref, settingsHref } from "@/lib/router";
@@ -40,16 +43,22 @@ export function Library() {
   const [deleting, setDeleting] = useState(false);
   const [quota, setQuota] = useState<QuotaResponse | null>(null);
 
-  // Hosted mode never needs a key — Claude calls go through the operator's Worker.
-  const needsSetup = backend.kind === "browser" && !IS_HOSTED && !hasApiKey();
+  const user = useAccountUser();
 
-  // Only non-null in hosted mode (backend.getQuota() returns null elsewhere).
+  // Hosted and cloud modes never need a key — Claude calls go through the operator's server.
+  const needsSetup = backend.kind === "browser" && !IS_HOSTED && !IS_CLOUD && !hasApiKey();
+
+  // Only non-null in hosted (per day) and cloud (per month) modes.
   const quotaExhausted = quota != null && quota.remaining <= 0;
-  const quotaMessage = quota
-    ? quotaExhausted
-      ? `You've used today's ${quota.limit} free recipes — more in ${formatResetHours(quota.resetsInSeconds)}`
-      : `${quota.remaining} of ${quota.limit} free recipes left today`
-    : null;
+  const quotaMessage = !quota
+    ? null
+    : IS_CLOUD
+      ? quotaExhausted
+        ? quotaExceededMessage(quota.limit, new Date(Date.now() + quota.resetsInSeconds * 1000))
+        : `${quota.remaining} of ${quota.limit} recipes left this month`
+      : quotaExhausted
+        ? `You've used today's ${quota.limit} free recipes — more in ${formatResetHours(quota.resetsInSeconds)}`
+        : `${quota.remaining} of ${quota.limit} free recipes left today`;
 
   const refresh = useCallback(() => {
     backend
@@ -74,6 +83,24 @@ export function Library() {
   useEffect(() => {
     refresh();
     refreshQuota();
+  }, [refresh, refreshQuota]);
+
+  // Cloud mode: recipes can be added from another device, so refresh when the tab comes
+  // back into view (the list is served from Firestore's live cache, so this is cheap).
+  useEffect(() => {
+    if (!IS_CLOUD) return;
+    const onVisible = () => {
+      if (document.visibilityState === "visible") {
+        refresh();
+        refreshQuota();
+      }
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", onVisible);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", onVisible);
+    };
   }, [refresh, refreshQuota]);
 
   async function confirmDelete() {
@@ -152,7 +179,9 @@ export function Library() {
                 )}
                 {backend.kind === "browser" && (
                   <p className="text-xs text-[hsl(var(--ink-faint))]">
-                    Audio stays on your device. Only the transcript is sent to make the recipe.{" "}
+                    {IS_CLOUD
+                      ? "Audio stays on your device. Only the transcript is sent to make the recipe, which is saved to your account."
+                      : "Audio stays on your device. Only the transcript is sent to make the recipe."}{" "}
                     <a
                       href={privacyHref()}
                       className="text-[hsl(var(--ink-muted))] underline underline-offset-2 hover:text-[hsl(var(--ink))]"
@@ -191,6 +220,8 @@ export function Library() {
           {error}
         </p>
       )}
+
+      {IS_CLOUD && user && <MoveLocalRecipesPrompt user={user} onMoved={refresh} />}
 
       <div className="space-y-3">
         <h2 className="text-[12px] font-medium uppercase tracking-[0.08em] text-[hsl(var(--ink-muted))]">

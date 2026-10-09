@@ -7,3 +7,8 @@
 /** True in a build made with `VITE_BACKEND=hosted` — Claude is called through the operator's
  * Cloudflare Worker (shared/proxy.ts) instead of the visitor's own API key. */
 export const IS_HOSTED = import.meta.env.VITE_BACKEND === "hosted";
+
+/** True in a build made with `VITE_BACKEND=cloud` — the signed-in SaaS mode: Firebase Auth +
+ * Firestore for the library, the Cloud Run API (shared/cloud.ts) for Claude. Transcription still
+ * runs in the browser, so `backend.kind` is "browser" here too. */
+export const IS_CLOUD = import.meta.env.VITE_BACKEND === "cloud";

@@ -18,6 +18,8 @@ import { ModelDownloadDialog } from "@/components/ModelDownloadDialog";
 import { findSpeechModelOption, DEFAULT_SPEECH_MODEL, type SpeechModelOption } from "@/backend/browser/modelCatalog";
 import { getBrowserSettings, saveBrowserSettings } from "@/backend/settings";
 import { useWakeLock } from "@/lib/processingHealth";
+import { AudioAvailableContext } from "@/lib/audioAvailability";
+import { IS_CLOUD } from "@/lib/mode";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
@@ -166,6 +168,8 @@ export function JobPage({ jobId, cookRoute }: { jobId: string; cookRoute: boolea
 
   const [currentTime, setCurrentTime] = useState<number | null>(null);
   const [audioDuration, setAudioDuration] = useState<number | null>(null);
+  // Cloud mode: false when the audio is on the device the recipe was uploaded from, not this one.
+  const [audioAvailable, setAudioAvailable] = useState(true);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [pollKey, setPollKey] = useState(0);
   const [progress, setProgress] = useState<JobProgress | null>(null);
@@ -220,6 +224,7 @@ export function JobPage({ jobId, cookRoute }: { jobId: string; cookRoute: boolea
     setUnitSystem("original");
     setScaleFactor(1);
     setCheckedIngredients(new Set());
+    setAudioAvailable(true);
     // Follow the route rather than forcing closed: this effect runs after the
     // cookRoute effect on mount, so `false` here broke deep links to #/jobs/:id/cook.
     setCookOpen(cookRoute);
@@ -435,7 +440,7 @@ export function JobPage({ jobId, cookRoute }: { jobId: string; cookRoute: boolea
   return (
     <div
       className={
-        job.status === "done"
+        job.status === "done" && audioAvailable
           ? "mx-auto max-w-[1120px] px-4 py-6 pb-24 space-y-6"
           : "mx-auto max-w-[1120px] px-4 py-6 pb-6 space-y-6"
       }
@@ -502,7 +507,12 @@ export function JobPage({ jobId, cookRoute }: { jobId: string; cookRoute: boolea
           {job.error && <JobErrorMessage error={job.error} />}
           {retryError && <p className="text-sm text-[hsl(var(--danger))]">{retryError}</p>}
           <div className="flex gap-2">
-            {transcript ? (
+            {IS_CLOUD ? (
+              // Cloud: Retry sends the saved transcript again (or transcribes again if there's none).
+              <Button size="sm" onClick={handleRetry} disabled={retrying}>
+                <RefreshCw className="h-4 w-4" /> {retrying ? "Retrying…" : "Retry"}
+              </Button>
+            ) : transcript ? (
               <>
                 <Button size="sm" onClick={() => setReextractConfirmOpen(true)}>
                   <RefreshCw className="h-4 w-4" /> Re-extract
@@ -524,7 +534,7 @@ export function JobPage({ jobId, cookRoute }: { jobId: string; cookRoute: boolea
       )}
 
       {job.status === "done" && displayedRecipe && (
-        <>
+        <AudioAvailableContext.Provider value={audioAvailable}>
           {isViewingOld && displayedMeta && (
             <div className="no-print flex items-center justify-between rounded-[10px] border border-[hsl(var(--accent-tint-strong))] bg-[hsl(var(--accent-tint))] px-4 py-2 text-sm">
               <span className="text-[hsl(var(--accent-text))]">
@@ -561,6 +571,11 @@ export function JobPage({ jobId, cookRoute }: { jobId: string; cookRoute: boolea
                     </h1>
                     {displayedRecipe.description && (
                       <p className="text-[hsl(var(--ink-muted))]">{displayedRecipe.description}</p>
+                    )}
+                    {!audioAvailable && (
+                      <p className="no-print text-xs text-[hsl(var(--ink-faint))]">
+                        The audio for this recipe is on the device you uploaded it from.
+                      </p>
                     )}
                     <p className="text-xs tabular-nums text-[hsl(var(--ink-faint))]">
                       {[
@@ -700,6 +715,7 @@ export function JobPage({ jobId, cookRoute }: { jobId: string; cookRoute: boolea
             jobId={jobId}
             title={job.title ?? job.fileName}
             activeStepText={activeStepText}
+            onAvailabilityChange={setAudioAvailable}
           />
 
           {cookOpen && !editing && !isViewingOld && (
@@ -717,7 +733,7 @@ export function JobPage({ jobId, cookRoute }: { jobId: string; cookRoute: boolea
               }}
             />
           )}
-        </>
+        </AudioAvailableContext.Provider>
       )}
 
       <Dialog open={reextractConfirmOpen} onOpenChange={setReextractConfirmOpen}>

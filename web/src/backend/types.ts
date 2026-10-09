@@ -4,6 +4,8 @@ import type { Job, QuotaResponse, Recipe, RecipeVersionMeta, Transcript, Version
 //   "server"  — the local Node server (whisper.cpp + Claude via CLI or API key).
 //   "browser" — fully client-side: Whisper runs in the browser (WebGPU/WASM), data lives
 //               in IndexedDB, and Claude is called directly with the user's own API key.
+//               ("hosted" and "cloud" builds also report "browser": both transcribe in the page;
+//               see lib/mode.ts for IS_HOSTED / IS_CLOUD.)
 // Both implement the same semantics as shared/api.ts (versions, rollback, retry, ...).
 
 export type BackendKind = "server" | "browser";
@@ -58,12 +60,14 @@ export interface Backend {
   /** Replaces the saved transcript with the user's corrected one (then call reextract). */
   putTranscript(id: string, transcript: Transcript): Promise<Transcript>;
 
-  /** Whole-library backup (browser/hosted modes only; `canBackup` tells the UI). */
+  /** Whole-library backup (browser/hosted/cloud modes; `canBackup` tells the UI). In cloud mode
+   * export reads the account (Firestore) and import moves the file into the account. */
   canBackup: boolean;
   exportLibrary(options: { includeAudio: boolean }): Promise<Blob>;
   importLibrary(file: File): Promise<{ imported: number; skipped: number }>;
 
-  /** Today's free-recipe allowance in hosted mode; null in other modes or if unavailable. */
+  /** The free-recipe allowance: today's in hosted mode, this month's in cloud mode (mapped from
+   * GET /me); null in other modes or if unavailable. */
   getQuota(): Promise<QuotaResponse | null>;
 
   /** Errors like "no API key" are thrown with this code so the UI can route to Settings. */
@@ -71,6 +75,16 @@ export interface Backend {
 
 export class NeedsSetupError extends Error {
   readonly code = "needs_setup";
+}
+
+/** Cloud mode: the recipe is in the account, but its audio only exists on the device it was
+ * uploaded from (audio never leaves the device). `getAudioUrl` throws this so the UI can hide
+ * click-to-hear and say why, instead of showing a player that can't play anything. */
+export class AudioNotOnDeviceError extends Error {
+  readonly code = "audio_not_on_device";
+  constructor(message = "The audio for this recipe is on the device you uploaded it from.") {
+    super(message);
+  }
 }
 
 // ---------------------------------------------------------------------------

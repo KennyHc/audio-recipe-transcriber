@@ -1,0 +1,106 @@
+rules_version = '2';
+
+// Security rules for the signed-in SaaS mode. Contract: shared/cloud.ts. Tests: test/rules.test.ts.
+//
+// The Cloud Run API (firebase-admin) bypasses these rules. It alone creates recipes, writes
+// "extracted"/"reextracted" versions, creates transcripts, and owns users/{uid}.usage and
+// system/*. That is what makes the monthly quota real: a browser can't put AI output into
+// the database without going through the API's counter.
+//
+// The browser may only:
+//   - read its own user doc, recipes, versions, and transcripts;
+//   - save an edit or a rollback: in ONE batch, create versions/{n+1} (source "edited" or
+//     "rollback") and update the recipe's currentVersion/latest/title/updatedAt to match;
+//   - update its own transcript (then ask the API to re-extract);
+//   - delete its own recipes (delete versions + transcript + recipe in one batch).
+// Phase 1 recipes are always private: nobody can change visibility or ownerId.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function recipePath(recipeId) {
+      return /databases/$(database)/documents/recipes/$(recipeId);
+    }
+
+    // Owner of an existing recipe, as it was before this request/batch.
+    function ownsRecipe(recipeId) {
+      return signedIn()
+        && exists(recipePath(recipeId))
+        && get(recipePath(recipeId)).data.ownerId == request.auth.uid;
+    }
+
+    match /users/{uid} {
+      allow read: if signedIn() && request.auth.uid == uid;
+      allow write: if false; // API only (usage, plan)
+    }
+
+    match /system/{docId} {
+      allow read, write: if false; // API only (daily budget)
+    }
+
+    match /recipes/{recipeId} {
+      // Queries must filter on ownerId == own uid.
+      allow read: if signedIn() && resource.data.ownerId == request.auth.uid;
+      allow create: if false; // API only (POST /recipes, /import)
+      allow delete: if signedIn() && resource.data.ownerId == request.auth.uid;
+
+      // Only as part of saving a new client version (see versions/{v} below).
+      allow update: if signedIn()
+        && resource.data.ownerId == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['title', 'updatedAt', 'currentVersion', 'latest'])
+        && request.resource.data.currentVersion == resource.data.currentVersion + 1
+        && request.resource.data.updatedAt is string
+        && request.resource.data.latest is map
+        && request.resource.data.title == request.resource.data.latest.title
+        && request.resource.data.title is string
+        && request.resource.data.title.size() <= 300
+        && newVersionMatches(recipeId, request.resource.data);
+
+      // The version doc written in the same batch carries exactly this recipe.
+      function newVersionMatches(recipeId, after) {
+        let path = /databases/$(database)/documents/recipes/$(recipeId)/versions/$(string(after.currentVersion));
+        return existsAfter(path)
+          && getAfter(path).data.recipe == after.latest
+          && getAfter(path).data.meta.source in ['edited', 'rollback'];
+      }
+
+      match /versions/{v} {
+        allow read: if ownsRecipe(recipeId);
+        allow update: if false; // history is immutable
+        allow delete: if ownsRecipe(recipeId);
+
+        allow create: if ownsRecipe(recipeId)
+          && request.resource.data.keys().hasOnly(['meta', 'recipe'])
+          && request.resource.data.meta.keys().hasOnly(['version', 'source', 'createdAt', 'note'])
+          && request.resource.data.meta.source in ['edited', 'rollback']
+          && request.resource.data.meta.version is int
+          && v == string(request.resource.data.meta.version)
+          && request.resource.data.meta.createdAt is string
+          && (request.resource.data.meta.note == null || request.resource.data.meta.note is string)
+          && request.resource.data.recipe is map
+          // Must land together with the matching recipe update (currentVersion == this one).
+          && getAfter(recipePath(recipeId)).data.currentVersion == request.resource.data.meta.version
+          && getAfter(recipePath(recipeId)).data.latest == request.resource.data.recipe;
+      }
+
+      match /private/{docId} {
+        allow read, delete: if ownsRecipe(recipeId);
+        allow create: if false; // API only
+        allow update: if ownsRecipe(recipeId)
+          && docId == 'transcript'
+          && request.resource.data.keys().hasOnly(['transcript', 'updatedAt'])
+          && request.resource.data.updatedAt is string
+          && request.resource.data.transcript is map
+          && request.resource.data.transcript.keys().hasOnly(['language', 'segments'])
+          && request.resource.data.transcript.segments is list;
+      }
+    }
+
+    // Anything not matched above is denied.
+  }
+}

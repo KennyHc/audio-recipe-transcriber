@@ -7,16 +7,19 @@
     "shared",
     "server",
     "web",
-    "worker"
+    "worker",
+    "api",
+    "firebase"
   ],
   "scripts": {
     "dev": "concurrently -n server,web -c blue,magenta \"npm run dev -w server\" \"npm run dev -w web\"",
-    "typecheck": "npm run typecheck -w server && npm run typecheck -w web && npm run typecheck -w worker",
-    "test": "npm run test -w server && npm run test -w web && npm run test -w worker",
+    "typecheck": "npm run typecheck -w server && npm run typecheck -w web && npm run typecheck -w worker && npm run typecheck -w api",
+    "test": "npm run test -w server && npm run test -w web && npm run test -w worker && npm run test -w api",
     "setup:whisper": "bash scripts/setup-whisper.sh",
     "eval": "npm run eval -w server --",
     "deploy:worker": "npm run deploy -w worker",
-    "deploy:site": "bash scripts/deploy-site.sh"
+    "deploy:site": "bash scripts/deploy-site.sh",
+    "test:rules": "npm run test -w firebase-config"
   },
   "devDependencies": {
     "concurrently": "^9.0.0",

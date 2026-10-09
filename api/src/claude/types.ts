@@ -1,0 +1,36 @@
+import type { ExtractedRecipe, RecipeWarning, Transcript } from "@recipe/shared";
+import type { ClaudeUsage } from "../cost";
+import { AppError } from "../errors";
+
+export interface ClaudeResult<T> {
+  output: T;
+  usage: ClaudeUsage;
+}
+
+/**
+ * The two Claude calls the API makes. Implementations return the model's RAW output; the
+ * deterministic post-processing (normalizeExtractedRecipe, finalizeWarnings) happens in
+ * pipeline.ts so it runs — and is tested — no matter which implementation is plugged in.
+ * Tests pass a fake; src/claude/anthropic.ts is the real one.
+ */
+export interface ClaudeService {
+  extract(transcript: Transcript): Promise<ClaudeResult<ExtractedRecipe>>;
+  verify(transcript: Transcript, recipe: ExtractedRecipe): Promise<ClaudeResult<RecipeWarning[]>>;
+}
+
+/** max_tokens for each call; also the worst-case output used to reserve budget. */
+export const EXTRACT_MAX_TOKENS = 8000;
+export const VERIFY_MAX_TOKENS = 8000;
+
+/**
+ * A response came back but was unusable (refusal, truncated, unparseable). Unlike a network
+ * or API error, those tokens were billed, so the budget settles with `usage` instead of
+ * releasing the reservation.
+ */
+export class ClaudeOutputError extends AppError {
+  readonly usage: ClaudeUsage;
+  constructor(usage: ClaudeUsage) {
+    super("upstream_error");
+    this.usage = usage;
+  }
+}

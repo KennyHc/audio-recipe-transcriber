@@ -4,10 +4,13 @@ import { consumeSetupMessage } from "@/lib/needsSetup";
 import { getBrowserSettings, saveBrowserSettings, maskApiKey } from "@/backend/settings";
 import { BROWSER_DB_NAME } from "@/backend/constants";
 import { deleteAllModelChunks } from "@/backend/browser/modelDownloader";
+import { closeDbConnection } from "@/backend/browser/db";
 import { SPEECH_MODEL_CATALOG, speechModelKey } from "@/backend/browser/modelCatalog";
 import { DEFAULT_BROWSER_SETTINGS } from "@/backend/types";
 import { backend } from "@/backend";
-import { IS_HOSTED } from "@/lib/mode";
+import { IS_CLOUD, IS_HOSTED } from "@/lib/mode";
+import { useAccountUser } from "@/lib/useAccount";
+import { AccountSection } from "@/components/account/AccountSection";
 import { formatMB } from "@/lib/downloadProgress";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
@@ -52,6 +55,10 @@ export function Settings() {
   const [restoreResult, setRestoreResult] = useState<string | null>(null);
   const [restoreError, setRestoreError] = useState<string | null>(null);
   const restoreInputRef = useRef<HTMLInputElement>(null);
+  const user = useAccountUser();
+  // Cloud mode exports from the account (Firestore) under Account → "Download all my data";
+  // the local backup section below is for the IndexedDB-only modes.
+  const showLocalBackup = backend.canBackup && !IS_CLOUD;
 
   useEffect(() => {
     setSetupMessage(consumeSetupMessage());
@@ -61,7 +68,7 @@ export function Settings() {
   // depends on every job's transcript/versions and, when checked, audio), so recompute it
   // whenever the "include audio" checkbox changes. Cheap for a typical local library.
   useEffect(() => {
-    if (!backend.canBackup) return;
+    if (!showLocalBackup) return;
     let cancelled = false;
     backend
       .exportLibrary({ includeAudio })
@@ -136,6 +143,8 @@ export function Settings() {
   async function handleDeleteAllData() {
     setDeleting(true);
     try {
+      // Close this page's own connection first, or the deletion waits on it.
+      await closeDbConnection();
       await new Promise<void>((resolve, reject) => {
         const req = indexedDB.deleteDatabase(BROWSER_DB_NAME);
         req.onsuccess = () => resolve();
@@ -174,9 +183,11 @@ export function Settings() {
           Settings
         </h1>
         <p className="text-sm text-[hsl(var(--ink-muted))]">
-          {IS_HOSTED
-            ? "Speech-to-text runs in your browser; recipes are made by a free hosted service. Your audio, transcripts, and recipes stay on this device."
-            : "Runs in your browser — your audio, transcripts, and recipes stay on this device."}
+          {IS_CLOUD
+            ? "Speech-to-text runs in your browser and your audio stays on this device. Recipes and transcripts are saved to your account."
+            : IS_HOSTED
+              ? "Speech-to-text runs in your browser; recipes are made by a free hosted service. Your audio, transcripts, and recipes stay on this device."
+              : "Runs in your browser — your audio, transcripts, and recipes stay on this device."}
         </p>
       </div>
 
@@ -187,7 +198,9 @@ export function Settings() {
         </div>
       )}
 
-      {!IS_HOSTED && (
+      {IS_CLOUD && user && <AccountSection user={user} />}
+
+      {!IS_HOSTED && !IS_CLOUD && (
         <section className="space-y-3 rounded-[10px] border border-[hsl(var(--border))] bg-[hsl(var(--surface))] p-5 sm:p-6">
           <h2 className="text-[12px] font-medium uppercase tracking-[0.08em] text-[hsl(var(--ink-muted))]">
             Anthropic API key
@@ -249,7 +262,15 @@ export function Settings() {
           Models
         </h2>
 
-        {IS_HOSTED ? (
+        {IS_CLOUD ? (
+          <div className="flex items-start gap-2 rounded-[10px] bg-[hsl(var(--sunken))] px-3.5 py-3 text-sm text-[hsl(var(--ink-muted))]">
+            <Sparkles className="h-4 w-4 shrink-0 mt-0.5 text-[hsl(var(--ink-faint))]" />
+            <div className="space-y-1">
+              <p className="text-[hsl(var(--ink))]">Recipes are made by Claude on our server.</p>
+              <p>Free: 30 recipes a month, re-extracts included.</p>
+            </div>
+          </div>
+        ) : IS_HOSTED ? (
           <div className="flex items-start gap-2 rounded-[10px] bg-[hsl(var(--sunken))] px-3.5 py-3 text-sm text-[hsl(var(--ink-muted))]">
             <Sparkles className="h-4 w-4 shrink-0 mt-0.5 text-[hsl(var(--ink-faint))]" />
             <div className="space-y-1">
@@ -327,7 +348,7 @@ export function Settings() {
         </div>
       </section>
 
-      {backend.canBackup && (
+      {showLocalBackup && (
         <section className="space-y-4 rounded-[10px] border border-[hsl(var(--border))] bg-[hsl(var(--surface))] p-5 sm:p-6">
           <h2 className="text-[12px] font-medium uppercase tracking-[0.08em] text-[hsl(var(--ink-muted))]">
             Your library
@@ -393,25 +414,26 @@ export function Settings() {
 
       <section className="space-y-3 rounded-[10px] border border-[hsl(var(--danger))]/30 bg-[hsl(var(--surface))] p-5 sm:p-6">
         <h2 className="text-[12px] font-medium uppercase tracking-[0.08em] text-[hsl(var(--ink-muted))]">
-          Danger zone
+          {IS_CLOUD ? "This device" : "Danger zone"}
         </h2>
         <p className="text-sm text-[hsl(var(--ink-muted))]">
-          Permanently deletes every recipe, transcript, and audio file stored in this browser, plus
-          the downloaded speech model and your saved settings. This can't be undone.
+          {IS_CLOUD
+            ? "Clears what's stored in this browser only: audio files, unfinished uploads, the downloaded speech model, and your settings here. Recipes in your account aren't affected, but click-to-hear stops working on this device."
+            : "Permanently deletes every recipe, transcript, and audio file stored in this browser, plus the downloaded speech model and your saved settings. This can't be undone."}
         </p>
         <Button variant="destructive" onClick={() => setDeleteOpen(true)}>
-          <Trash2 className="h-3.5 w-3.5" /> Delete all local data
+          <Trash2 className="h-3.5 w-3.5" /> {IS_CLOUD ? "Clear this device" : "Delete all local data"}
         </Button>
       </section>
 
       <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Delete all local data?</DialogTitle>
+            <DialogTitle>{IS_CLOUD ? "Clear this device?" : "Delete all local data?"}</DialogTitle>
             <DialogDescription>
-              This permanently deletes every recipe, transcript, and audio file stored in this
-              browser, the downloaded speech model, and your saved settings (including your API
-              key). This can't be undone.
+              {IS_CLOUD
+                ? "This deletes the audio files, unfinished uploads, downloaded speech model, and settings stored in this browser. Your account and its recipes stay as they are."
+                : "This permanently deletes every recipe, transcript, and audio file stored in this browser, the downloaded speech model, and your saved settings (including your API key). This can't be undone."}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -419,7 +441,7 @@ export function Settings() {
               <Button variant="outline">Cancel</Button>
             </DialogClose>
             <Button variant="destructive" onClick={handleDeleteAllData} disabled={deleting}>
-              {deleting ? "Deleting…" : "Delete everything"}
+              {deleting ? "Deleting…" : IS_CLOUD ? "Clear this device" : "Delete everything"}
             </Button>
           </DialogFooter>
         </DialogContent>

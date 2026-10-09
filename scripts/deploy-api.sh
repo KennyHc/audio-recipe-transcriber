@@ -1,0 +1,122 @@
+#!/usr/bin/env bash
+# Builds and deploys the API (api/) to Cloud Run as service "api" in europe-west1.
+#
+#   bash scripts/deploy-api.sh
+#
+# Prerequisite: scripts/gcp-setup.sh has run (APIs enabled, Firestore created, secret
+# `anthropic-api-key` stored). Safe to re-run: the service account and IAM bindings are
+# created only if missing. Uses --project on every gcloud command and never changes your
+# gcloud defaults. The Anthropic key is never read here: Cloud Run mounts it from Secret
+# Manager as ANTHROPIC_API_KEY at runtime.
+#
+# Overridable (env): DAILY_BUDGET_USD (2), FREE_MONTHLY_RECIPES (30), EXTRACTOR_MODEL,
+# VERIFIER_MODEL (claude-haiku-4-5), ALLOWED_ORIGINS (https://recipe-transcriber.pages.dev).
+#
+# bash 3.2 compatible (macOS): no mapfile, no associative arrays, no ${var,,}.
+set -euo pipefail
+
+PROJECT="recipe-transcriber-eu"
+REGION="europe-west1"
+SERVICE="api"
+SA_NAME="api-runner"
+SA_EMAIL="$SA_NAME@$PROJECT.iam.gserviceaccount.com"
+SECRET="anthropic-api-key"
+
+DAILY_BUDGET_USD="${DAILY_BUDGET_USD:-2}"
+FREE_MONTHLY_RECIPES="${FREE_MONTHLY_RECIPES:-30}"
+EXTRACTOR_MODEL="${EXTRACTOR_MODEL:-claude-haiku-4-5}"
+VERIFIER_MODEL="${VERIFIER_MODEL:-claude-haiku-4-5}"
+ALLOWED_ORIGINS="${ALLOWED_ORIGINS:-https://recipe-transcriber.pages.dev}"
+
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$ROOT"
+
+step() { printf '\n\033[1;34m==> %s\033[0m\n' "$*"; }
+ok() { printf '\033[32m  ✓ %s\033[0m\n' "$*"; }
+die() { printf '\033[1;31m  ✗ %s\033[0m\n' "$*" >&2; exit 1; }
+
+# Same fail-closed checks the API makes at startup, so a typo fails here, not in production.
+[[ "$DAILY_BUDGET_USD" =~ ^[0-9]+([.][0-9]+)?$ ]] || die "DAILY_BUDGET_USD must be a non-negative number"
+[[ "$FREE_MONTHLY_RECIPES" =~ ^[0-9]+$ ]] || die "FREE_MONTHLY_RECIPES must be a non-negative integer"
+case "$ALLOWED_ORIGINS" in *@*) die "ALLOWED_ORIGINS must not contain '@' (used as the env-var delimiter)";; esac
+
+step "Account"
+ACCOUNT="$(gcloud auth list --filter=status:ACTIVE --format='value(account)' 2>/dev/null || true)"
+[[ -n "$ACCOUNT" ]] || die "not signed in to gcloud (run: gcloud auth login)"
+ok "signed in as $ACCOUNT; project $PROJECT; region $REGION"
+
+step "Secret $SECRET"
+gcloud secrets describe "$SECRET" --project="$PROJECT" >/dev/null 2>&1 \
+  || die "secret $SECRET not found — run scripts/gcp-setup.sh first"
+ok "exists (value not read)"
+
+step "Service account $SA_NAME"
+if gcloud iam service-accounts describe "$SA_EMAIL" --project="$PROJECT" >/dev/null 2>&1; then
+  ok "already exists"
+else
+  gcloud iam service-accounts create "$SA_NAME" --project="$PROJECT" \
+    --display-name="Recipe Transcriber API (Cloud Run)" >/dev/null
+  ok "created"
+fi
+
+step "IAM: least privilege for $SA_NAME"
+# Firestore read/write (bypasses rules via firebase-admin) and Firebase Auth admin (verify
+# tokens with revocation checks, delete users on account deletion). Nothing else.
+for ROLE in roles/datastore.user roles/firebaseauth.admin; do
+  if gcloud projects get-iam-policy "$PROJECT" \
+    --flatten='bindings[].members' --filter="bindings.role=$ROLE AND bindings.members=serviceAccount:$SA_EMAIL" \
+    --format='value(bindings.role)' 2>/dev/null | grep -qx "$ROLE"; then
+    ok "$ROLE already granted"
+  else
+    gcloud projects add-iam-policy-binding "$PROJECT" --member="serviceAccount:$SA_EMAIL" \
+      --role="$ROLE" --condition=None >/dev/null
+    ok "$ROLE granted"
+  fi
+done
+# Only this one secret, not project-wide Secret Manager access.
+if gcloud secrets get-iam-policy "$SECRET" --project="$PROJECT" \
+  --flatten='bindings[].members' --filter="bindings.role=roles/secretmanager.secretAccessor AND bindings.members=serviceAccount:$SA_EMAIL" \
+  --format='value(bindings.role)' 2>/dev/null | grep -q secretAccessor; then
+  ok "secretAccessor on $SECRET already granted"
+else
+  gcloud secrets add-iam-policy-binding "$SECRET" --project="$PROJECT" \
+    --member="serviceAccount:$SA_EMAIL" --role=roles/secretmanager.secretAccessor >/dev/null
+  ok "secretAccessor on $SECRET granted"
+fi
+
+step "Typecheck + build api/dist"
+npm run typecheck -w api
+npm run build -w api
+[[ -f api/dist/server.js ]] || die "api/dist/server.js missing after build"
+
+step "Deploy Cloud Run service $SERVICE (Cloud Build, a few minutes)"
+# '^@^' switches gcloud's list delimiter to '@' so ALLOWED_ORIGINS can contain commas.
+# GOOGLE_CLOUD_PROJECT pins firebase-admin to this project for token verification.
+ENV_VARS="^@^GOOGLE_CLOUD_PROJECT=$PROJECT"
+ENV_VARS="$ENV_VARS@EXTRACTOR_MODEL=$EXTRACTOR_MODEL@VERIFIER_MODEL=$VERIFIER_MODEL"
+ENV_VARS="$ENV_VARS@DAILY_BUDGET_USD=$DAILY_BUDGET_USD@FREE_MONTHLY_RECIPES=$FREE_MONTHLY_RECIPES"
+ENV_VARS="$ENV_VARS@ALLOWED_ORIGINS=$ALLOWED_ORIGINS@REQUIRE_APP_CHECK=true"
+
+# --allow-unauthenticated: Cloud Run IAM is open; every route except /healthz checks a
+# Firebase ID token + App Check token itself. --max-instances bounds cost if abused.
+gcloud run deploy "$SERVICE" --project="$PROJECT" --region="$REGION" --quiet \
+  --source api \
+  --service-account="$SA_EMAIL" \
+  --set-secrets="ANTHROPIC_API_KEY=$SECRET:latest" \
+  --set-env-vars="$ENV_VARS" \
+  --allow-unauthenticated \
+  --max-instances=3 \
+  --memory=512Mi \
+  --cpu=1 \
+  --concurrency=20 \
+  --timeout=120
+
+step "Smoke test"
+URL="$(gcloud run services describe "$SERVICE" --project="$PROJECT" --region="$REGION" --format='value(status.url)')"
+[[ -n "$URL" ]] || die "couldn't read the service URL"
+if curl -fsS "$URL/healthz" >/dev/null; then ok "$URL/healthz is up"; else die "$URL/healthz failed"; fi
+STATUS="$(curl -s -o /dev/null -w '%{http_code}' "$URL/me")"
+[[ "$STATUS" == "401" ]] && ok "/me without tokens → 401 (auth enforced)" || die "/me without tokens returned $STATUS, expected 401"
+
+echo
+echo "  API URL: $URL   (set it as the web app's cloud API base)"

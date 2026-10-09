@@ -1,5 +1,6 @@
 import type { Backend } from "./types";
 import { createServerBackend } from "./server";
+import type { Account } from "./account";
 
 // The build-time mode switch. Vite inlines `import.meta.env.VITE_BACKEND` as a string
 // literal at build time, so `npm run build` (VITE_BACKEND unset → "server" branch) never
@@ -12,16 +13,27 @@ import { createServerBackend } from "./server";
 // The cost is that module evaluation — and therefore first paint — waits for the dynamic
 // import to resolve in browser mode; that's a one-time, same-tick cost since the import
 // itself is local code (no network round trip beyond the browser backend's own chunk).
-async function resolveBackend(): Promise<Backend> {
+async function resolveRuntime(): Promise<{ backend: Backend; account: Account | null }> {
+  // "cloud" (signed-in SaaS) — Firebase is only ever reachable through this branch, so the
+  // other builds don't contain it (same dead-code elimination as below).
+  if (import.meta.env.VITE_BACKEND === "cloud") {
+    const { createCloudRuntime } = await import("./cloud");
+    return createCloudRuntime();
+  }
   // "hosted" shares the same in-browser backend as "browser" (IndexedDB storage, in-page
   // Whisper pipeline) — only its Claude calls differ, swapped inside browser/claudeProvider.ts.
   if (import.meta.env.VITE_BACKEND === "browser" || import.meta.env.VITE_BACKEND === "hosted") {
     const { createBrowserBackend } = await import("./browser");
-    return createBrowserBackend();
+    return { backend: createBrowserBackend(), account: null };
   }
-  return createServerBackend();
+  return { backend: createServerBackend(), account: null };
 }
 
-export const backend: Backend = await resolveBackend();
+const runtime = await resolveRuntime();
+
+export const backend: Backend = runtime.backend;
+/** The signed-in account in cloud mode; null in every other mode (no accounts there). */
+export const account: Account | null = runtime.account;
 
 export * from "./types";
+export type { Account, AccountUser } from "./account";

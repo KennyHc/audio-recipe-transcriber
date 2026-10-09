@@ -1,6 +1,7 @@
 import { Play } from "lucide-react";
 import { formatTimestamp } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { useAudioAvailable } from "@/lib/audioAvailability";
 
 export function TimestampButton({
   seconds,
@@ -13,7 +14,8 @@ export function TimestampButton({
   active?: boolean;
   className?: string;
 }) {
-  if (seconds === null) return null;
+  const audioAvailable = useAudioAvailable();
+  if (seconds === null || !audioAvailable) return null;
   return (
     <button
       type="button"

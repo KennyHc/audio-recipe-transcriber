@@ -115,6 +115,40 @@ async function extractVerifyAndSave(jobId: string, source: VersionSource): Promi
   await db.updateJob(jobId, { status: "done", error: null, title: recipe.title });
 }
 
+// ---------------------------------------------------------------------------
+// The finish step: what happens after the transcript is saved. Browser/hosted modes run
+// extract -> verify -> save a version right here (extractVerifyAndSave). Cloud mode swaps in
+// a step that sends the transcript to the API instead (backend/cloud/finish.ts), which saves
+// the recipe in the account. Everything around it — the queue, statuses, progress, and the
+// error handling in guarded() — is shared.
+// ---------------------------------------------------------------------------
+
+export interface FinishContext {
+  /** Moves the job to `status` and shows `label` (default: the stage's usual label). */
+  setStage(status: JobStatus, label?: string): Promise<void>;
+}
+
+/** Runs after transcription ("extracted") and for re-extracts ("reextracted"). Throwing fails the
+ * job with the error's message (see guarded()). */
+export type FinishStep = (jobId: string, source: "extracted" | "reextracted", ctx: FinishContext) => Promise<void>;
+
+const defaultFinish: FinishStep = (jobId, source) => extractVerifyAndSave(jobId, source);
+let finishStep: FinishStep = defaultFinish;
+
+/** Replaces the finish step (cloud mode). `null` restores the default local extract+verify. */
+export function setFinishStep(step: FinishStep | null): void {
+  finishStep = step ?? defaultFinish;
+}
+
+function finish(jobId: string, source: "extracted" | "reextracted"): Promise<void> {
+  return finishStep(jobId, source, {
+    async setStage(status, label) {
+      await setStatus(jobId, status);
+      setProgress(jobId, { label: label ?? STAGE_LABEL[status], fraction: null });
+    },
+  });
+}
+
 async function transcribeAndSave(jobId: string): Promise<void> {
   const audio = await db.getAudio(jobId);
   if (!audio) {
@@ -211,7 +245,7 @@ export async function runPipeline(jobId: string): Promise<void> {
       await setStatus(jobId, "transcribing");
       setProgress(jobId, { label: STAGE_LABEL.transcribing, fraction: null });
       await transcribeAndSave(jobId);
-      await extractVerifyAndSave(jobId, "extracted");
+      await finish(jobId, "extracted");
     }),
   );
 }
@@ -221,7 +255,7 @@ export async function runPipeline(jobId: string): Promise<void> {
  * (callers should check both — see index.ts's reextract()). */
 export async function runReextract(jobId: string): Promise<void> {
   await markQueued(jobId);
-  void enqueue(() => guarded(jobId, () => extractVerifyAndSave(jobId, "reextracted")));
+  void enqueue(() => guarded(jobId, () => finish(jobId, "reextracted")));
 }
 
 /** Re-runs the full pipeline from stored audio. Only valid from an error

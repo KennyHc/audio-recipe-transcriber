@@ -14,6 +14,7 @@ import {
   runPipeline,
   runReextract,
   runRetry,
+  setFinishStep,
   startPipeline,
 } from "./runner";
 
@@ -270,5 +271,54 @@ describe("recoverInterruptedJobs", () => {
     const job = await db.getJob(jobId);
     expect(job?.status).toBe("done");
     expect(job?.title).toBe("Already finished");
+  });
+});
+
+describe("finish step seam (cloud mode)", () => {
+  afterEach(() => setFinishStep(null));
+
+  it("runs a replaced finish step after transcription instead of local extract+verify", async () => {
+    const calls: string[] = [];
+    setFinishStep(async (id, source, ctx) => {
+      calls.push(`${id}:${source}`);
+      await ctx.setStage("extracting", "Making your recipe");
+      expect(getProgress(id)?.label).toBe("Making your recipe");
+      await db.updateJob(id, { status: "done", title: "From the API" });
+    });
+    await seedJob();
+    await db.saveAudio(jobId, "clip.mp3", new Blob(["audio"]));
+
+    await runPipeline(jobId);
+    const job = await waitForStatus("done");
+
+    expect(calls).toEqual([`${jobId}:extracted`]);
+    expect(job.title).toBe("From the API");
+    expect(extractRecipe).not.toHaveBeenCalled();
+    expect(await db.getTranscript(jobId)).toEqual(transcript);
+  });
+
+  it("re-extract goes through the replaced step too, and its error fails the job", async () => {
+    setFinishStep(async () => {
+      throw new Error("You've used your 30 free recipes this month.");
+    });
+    await seedJob({ status: "error", error: "old" });
+    await db.saveTranscript(jobId, transcript);
+
+    await runReextract(jobId);
+    const job = await waitForStatus("error");
+    expect(job.error).toBe("You've used your 30 free recipes this month.");
+    expect(transcribeAudio).not.toHaveBeenCalled();
+  });
+
+  it("setFinishStep(null) restores local extract+verify", async () => {
+    setFinishStep(async () => {
+      throw new Error("should not run");
+    });
+    setFinishStep(null);
+    await seedJob();
+    await db.saveAudio(jobId, "clip.mp3", new Blob(["audio"]));
+    await runPipeline(jobId);
+    await waitForStatus("done");
+    expect(extractRecipe).toHaveBeenCalled();
   });
 });

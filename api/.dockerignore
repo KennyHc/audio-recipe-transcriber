@@ -1,0 +1,10 @@
+# Only package.json and dist/ go into the image.
+node_modules
+src
+test
+*.md
+build.mjs
+tsconfig.json
+vitest.config.ts
+.env
+.env.*

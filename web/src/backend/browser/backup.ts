@@ -61,44 +61,55 @@ function base64ToBlob(base64: string, mimeType: string): Blob {
 // Export
 // ---------------------------------------------------------------------------
 
-export async function exportLibrary(options: { includeAudio: boolean }): Promise<Blob> {
-  const jobs = await db.listJobs();
-  const backupJobs: BackupJob[] = [];
+/** One job as a BackupJob: transcript, every version oldest-first, and (optionally) audio. */
+export async function buildBackupJob(job: Job, options: { includeAudio: boolean }): Promise<BackupJob> {
+  const transcript = await db.getTranscript(job.id);
 
-  for (const job of jobs) {
-    const transcript = await db.getTranscript(job.id);
-
-    const metas = await db.listVersions(job.id); // newest first
-    const ascendingNumbers = metas.map((m) => m.version).sort((a, b) => a - b);
-    const versions: VersionedRecipe[] = [];
-    for (const version of ascendingNumbers) {
-      const versioned = await db.getVersion(job.id, version);
-      if (versioned) versions.push(versioned);
-    }
-
-    let audio: BackupAudio | null = null;
-    if (options.includeAudio) {
-      const record = await db.getAudio(job.id);
-      if (record) {
-        audio = {
-          fileName: record.fileName,
-          mimeType: record.blob.type || "application/octet-stream",
-          base64: await blobToBase64(record.blob),
-        };
-      }
-    }
-
-    backupJobs.push({ job, transcript, versions, audio });
+  const metas = await db.listVersions(job.id); // newest first
+  const ascendingNumbers = metas.map((m) => m.version).sort((a, b) => a - b);
+  const versions: VersionedRecipe[] = [];
+  for (const version of ascendingNumbers) {
+    const versioned = await db.getVersion(job.id, version);
+    if (versioned) versions.push(versioned);
   }
 
+  const audio = options.includeAudio ? await localAudioForBackup(job.id) : null;
+  return { job, transcript, versions, audio };
+}
+
+/** This device's audio for `jobId` in backup form, or null if there is none. */
+export async function localAudioForBackup(jobId: string): Promise<BackupAudio | null> {
+  const record = await db.getAudio(jobId);
+  if (!record) return null;
+  return {
+    fileName: record.fileName,
+    mimeType: record.blob.type || "application/octet-stream",
+    base64: await blobToBase64(record.blob),
+  };
+}
+
+/** Saves a backup's audio on this device under `jobId`. */
+export async function saveBackupAudio(jobId: string, audio: BackupAudio): Promise<void> {
+  await db.saveAudio(jobId, audio.fileName, base64ToBlob(audio.base64, audio.mimeType));
+}
+
+export function backupBlob(jobs: BackupJob[]): Blob {
   const backup: LibraryBackup = {
     format: BACKUP_FORMAT,
     version: BACKUP_VERSION,
     exportedAt: new Date().toISOString(),
-    jobs: backupJobs,
+    jobs,
   };
-
   return new Blob([JSON.stringify(backup)], { type: "application/json" });
+}
+
+export async function exportLibrary(options: { includeAudio: boolean }): Promise<Blob> {
+  const jobs = await db.listJobs();
+  const backupJobs: BackupJob[] = [];
+  for (const job of jobs) {
+    backupJobs.push(await buildBackupJob(job, options));
+  }
+  return backupBlob(backupJobs);
 }
 
 // ---------------------------------------------------------------------------
@@ -107,7 +118,8 @@ export async function exportLibrary(options: { includeAudio: boolean }): Promise
 
 const STATUSES_KEPT_AS_IS = new Set(["done", "error"]);
 
-export async function importLibrary(file: File): Promise<{ imported: number; skipped: number }> {
+/** Reads and validates a backup file, with a friendly error for each way it can be wrong. */
+export async function parseBackupFile(file: File): Promise<LibraryBackup> {
   let raw: unknown;
   try {
     raw = JSON.parse(await file.text());
@@ -128,11 +140,16 @@ export async function importLibrary(file: File): Promise<{ imported: number; ski
   if (!parsed.success) {
     throw new Error("This backup file is corrupt or in an unexpected format.");
   }
+  return parsed.data;
+}
+
+export async function importLibrary(file: File): Promise<{ imported: number; skipped: number }> {
+  const backup = await parseBackupFile(file);
 
   let imported = 0;
   let skipped = 0;
 
-  for (const backupJob of parsed.data.jobs) {
+  for (const backupJob of backup.jobs) {
     const existing = await db.getJob(backupJob.job.id);
     if (existing) {
       skipped++;
@@ -154,11 +171,7 @@ export async function importLibrary(file: File): Promise<{ imported: number; ski
     }
 
     if (backupJob.audio) {
-      await db.saveAudio(
-        job.id,
-        backupJob.audio.fileName,
-        base64ToBlob(backupJob.audio.base64, backupJob.audio.mimeType),
-      );
+      await saveBackupAudio(job.id, backupJob.audio);
     }
 
     imported++;

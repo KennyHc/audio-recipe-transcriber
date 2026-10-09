@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import type { Job, Transcript } from "@recipe/shared";
 import { backend } from "@/backend";
 import { routeIfNeedsSetup } from "@/lib/needsSetup";
-import { IS_HOSTED } from "@/lib/mode";
+import { IS_CLOUD, IS_HOSTED } from "@/lib/mode";
 import { formatTimestamp } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { changedSegmentIndices, buildEditedTranscript, hasUnsavedTranscriptEdits } from "@/lib/transcriptEdit";
@@ -243,6 +243,7 @@ export function TranscriptView({
             Saving and re-extracting creates a new recipe version from the corrected
             transcript — your previous versions stay in History.
             {IS_HOSTED && " Uses one of today's free recipes."}
+            {IS_CLOUD && " Uses one of this month's recipes."}
           </p>
           <div className="flex flex-wrap justify-end gap-2">
             <Button size="sm" variant="outline" onClick={requestCancel} disabled={busy !== null}>

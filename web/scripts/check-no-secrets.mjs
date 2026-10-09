@@ -6,11 +6,13 @@
 // shared/proxy.ts). The BYOK browser build legitimately calls api.anthropic.com from
 // backend/browser/claude.ts, so that check only runs with --hosted.
 //
-// Run automatically at the end of `npm run build:hosted` (see web/package.json). Exits 1 and
+// Run automatically at the end of `npm run build:hosted` and `npm run build:cloud` (see
+// web/package.json) — cloud mode is held to the same rule: Claude is only reached via the API. Exits 1 and
 // prints every offending file/match on failure; prints a one-line PASS and exits 0 otherwise.
 //
 // Flags:
 //   --hosted        also fail on any "api.anthropic.com" reference (see above)
+//   --cloud         same check as --hosted, labelled for the signed-in cloud build
 //   --dir <path>    scan this directory instead of web/dist (used by check-no-secrets.test.ts
 //                   to point at temp-dir fixtures without touching a real build)
 
@@ -74,14 +76,15 @@ export function scan(scanDir, { hostedMode }) {
 }
 
 function parseArgs(argv) {
-  const hostedMode = argv.includes("--hosted");
+  const cloud = argv.includes("--cloud");
+  const hostedMode = argv.includes("--hosted") || cloud;
   const dirFlagIndex = argv.indexOf("--dir");
   const dir = dirFlagIndex !== -1 ? argv[dirFlagIndex + 1] : undefined;
-  return { hostedMode, dir: dir ? resolve(dir) : DEFAULT_DIST_DIR };
+  return { hostedMode, label: cloud ? "cloud" : hostedMode ? "hosted" : "default", dir: dir ? resolve(dir) : DEFAULT_DIST_DIR };
 }
 
 function main() {
-  const { hostedMode, dir } = parseArgs(process.argv.slice(2));
+  const { hostedMode, label, dir } = parseArgs(process.argv.slice(2));
 
   let distStat;
   try {
@@ -100,7 +103,7 @@ function main() {
   const { files, findings } = scan(dir, { hostedMode });
 
   if (findings.length > 0) {
-    console.error(`check-no-secrets: FAILED (${hostedMode ? "hosted" : "default"} mode, ${files.length} files scanned)\n`);
+    console.error(`check-no-secrets: FAILED (${label} mode, ${files.length} files scanned)\n`);
     for (const f of findings) console.error(`  - ${f}`);
     process.exit(1);
     return;
@@ -109,7 +112,7 @@ function main() {
   const checkedFor = hostedMode
     ? "no key and no api.anthropic.com reference found"
     : "no key found (api.anthropic.com check skipped — pass --hosted to enable it)";
-  console.log(`check-no-secrets: PASS (${hostedMode ? "hosted" : "default"} mode, ${files.length} files scanned, ${checkedFor})`);
+  console.log(`check-no-secrets: PASS (${label} mode, ${files.length} files scanned, ${checkedFor})`);
 }
 
 // Only run as a CLI when executed directly (not when imported by check-no-secrets.test.ts).

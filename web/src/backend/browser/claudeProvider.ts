@@ -3,6 +3,9 @@
 //   "browser" (BYOK)  — calls Claude directly with the visitor's own API key (./claude.ts).
 //   "hosted"           — calls the operator's Cloudflare Worker via a Turnstile-gated proxy
 //                         request (./proxyClaude.ts); no Anthropic key ever reaches the browser.
+//   "cloud"            — never calls Claude from the browser: the runner's finish step is
+//                         replaced (backend/cloud/finish.ts) and the API extracts. ./noClaude.ts
+//                         only throws, so neither the SDK nor api.anthropic.com enter the bundle.
 //
 // Resolved with a statically-known `import.meta.env.VITE_BACKEND` branch, mirroring
 // backend/index.ts's resolveBackend — Vite/esbuild's dead-code elimination drops the unreached
@@ -30,6 +33,9 @@ interface ClaudeModule {
 async function resolveClaudeModule(): Promise<ClaudeModule> {
   if (import.meta.env.VITE_BACKEND === "hosted") {
     return import("./proxyClaude");
+  }
+  if (import.meta.env.VITE_BACKEND === "cloud") {
+    return import("./noClaude");
   }
   return import("./claude");
 }
