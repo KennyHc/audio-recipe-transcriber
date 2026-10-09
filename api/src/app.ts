@@ -71,7 +71,7 @@ export function createApp(deps: AppDeps): Hono<{ Variables: AuthVariables }> {
     }),
   );
 
-  app.get("/healthz", (c) => c.json({ ok: true }));
+  app.get("/health", (c) => c.json({ ok: true }));
 
   const appCheck = requireAppCheck(deps.appCheck, config.requireAppCheck);
   const user = requireUser(auth, { now });

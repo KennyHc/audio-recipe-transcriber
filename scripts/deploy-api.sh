@@ -97,7 +97,7 @@ ENV_VARS="$ENV_VARS@EXTRACTOR_MODEL=$EXTRACTOR_MODEL@VERIFIER_MODEL=$VERIFIER_MO
 ENV_VARS="$ENV_VARS@DAILY_BUDGET_USD=$DAILY_BUDGET_USD@FREE_MONTHLY_RECIPES=$FREE_MONTHLY_RECIPES"
 ENV_VARS="$ENV_VARS@ALLOWED_ORIGINS=$ALLOWED_ORIGINS@REQUIRE_APP_CHECK=true"
 
-# --allow-unauthenticated: Cloud Run IAM is open; every route except /healthz checks a
+# --allow-unauthenticated: Cloud Run IAM is open; every route except /health checks a
 # Firebase ID token + App Check token itself. --max-instances bounds cost if abused.
 gcloud run deploy "$SERVICE" --project="$PROJECT" --region="$REGION" --quiet \
   --source api \
@@ -112,9 +112,10 @@ gcloud run deploy "$SERVICE" --project="$PROJECT" --region="$REGION" --quiet \
   --timeout=120
 
 step "Smoke test"
+# (Not /healthz: Cloud Run reserves paths ending in "z" and answers them with its own 404.)
 URL="$(gcloud run services describe "$SERVICE" --project="$PROJECT" --region="$REGION" --format='value(status.url)')"
 [[ -n "$URL" ]] || die "couldn't read the service URL"
-if curl -fsS "$URL/healthz" >/dev/null; then ok "$URL/healthz is up"; else die "$URL/healthz failed"; fi
+if curl -fsS "$URL/health" >/dev/null; then ok "$URL/health is up"; else die "$URL/health failed"; fi
 STATUS="$(curl -s -o /dev/null -w '%{http_code}' "$URL/me")"
 [[ "$STATUS" == "401" ]] && ok "/me without tokens → 401 (auth enforced)" || die "/me without tokens returned $STATUS, expected 401"
 

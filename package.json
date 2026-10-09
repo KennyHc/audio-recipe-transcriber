@@ -19,6 +19,8 @@
     "eval": "npm run eval -w server --",
     "deploy:worker": "npm run deploy -w worker",
     "deploy:site": "bash scripts/deploy-site.sh",
+    "deploy:site:cloud": "bash scripts/deploy-cloud-site.sh",
+    "deploy:api": "bash scripts/deploy-api.sh",
     "test:rules": "npm run test -w firebase-config"
   },
   "devDependencies": {

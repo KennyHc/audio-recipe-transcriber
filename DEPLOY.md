@@ -1,4 +1,36 @@
-# Deploying the hosted app (Cloudflare)
+# Deploying
+
+**Live since 2026-10-09: the signed-in version ("cloud" mode).** recipe-transcriber.pages.dev
+serves the cloud build; its backend is on Google Cloud (project `recipe-transcriber-eu`).
+The anonymous Cloudflare Worker below still runs, so switching back is one `npm run deploy:site`.
+
+## Signed-in version (Google Cloud + Cloudflare Pages)
+
+| Piece | Where |
+|---|---|
+| Sign-in | Firebase Auth (Google, email link) |
+| Data | Firestore `eur3` (EU); rules in `firebase/firestore.rules` |
+| API | Cloud Run `api`, europe-west1 — https://api-391833097082.europe-west1.run.app |
+| Anthropic key | Secret Manager `anthropic-api-key` (only the `api-runner` service account can read it) |
+| Bot check | App Check, reCAPTCHA Enterprise |
+| Limits | 30 recipes/account/month, $2/day Claude budget (env vars in `scripts/deploy-api.sh`) |
+
+One-time setup: `bash scripts/gcp-setup.sh recipe-transcriber-eu` (done). Then, after changes:
+
+```bash
+cd firebase && npx firebase deploy --only firestore:rules,firestore:indexes --project recipe-transcriber-eu
+npm run deploy:api
+VITE_API_BASE=https://api-391833097082.europe-west1.run.app npm run deploy:site:cloud
+```
+
+Local development against the emulators: `npm run emulators -w firebase-config`,
+`npm run dev:emulators -w api`, `npm run dev:cloud:emulators -w web` (or the `rt-emulators`,
+`rt-api`, `rt-cloud` launch configs). The emulator's sign-in links are listed at
+http://127.0.0.1:9099/emulator/v1/projects/demo-recipe/oobCodes.
+
+---
+
+# Anonymous version (Cloudflare)
 
 The hosted app is a static site on **Cloudflare Pages** (pages.dev — Hugging Face blocks downloads from *.workers.dev sites) plus a small API on **Cloudflare
 Workers**. Speech-to-text runs on each visitor's device; only the transcript goes to the

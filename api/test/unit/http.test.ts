@@ -124,8 +124,8 @@ describe("ID token middleware", () => {
 describe("routing, CORS, errors", () => {
   const app = build({ requireAppCheck: false });
 
-  it("GET /healthz needs no auth", async () => {
-    const res = await app.request("/healthz");
+  it("GET /health needs no auth", async () => {
+    const res = await app.request("/health");
     expect(res.status).toBe(200);
   });
 

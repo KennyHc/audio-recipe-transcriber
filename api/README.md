@@ -7,7 +7,7 @@ Plan: `PHASE1-PLAN.md`.
 
 | Route | |
 |---|---|
-| `GET /healthz` | no auth |
+| `GET /health` | no auth |
 | `POST /recipes` | extract + verify + save v1; idempotent on `id`; counts 1 |
 | `POST /recipes/:id/reextract` | new `reextracted` version from the saved transcript; counts 1 |
 | `POST /import` | bulk import of a local library; no Claude, no quota |
