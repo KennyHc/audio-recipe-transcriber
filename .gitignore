@@ -30,3 +30,6 @@ eval/results/
 !.env.example
 !.env.*.example
 .wrangler-dry-run/
+
+# Firebase CLI deploy cache
+.firebase/
