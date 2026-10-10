@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Builds the signed-in web app (VITE_BACKEND=cloud) and publishes it to Cloudflare Pages
-# (recipe-transcriber.pages.dev), replacing the anonymous hosted build.
+# (recipe-transcriber.pages.dev) and Firebase Hosting (recipe-transcriber-eu.web.app).
 #
 #   VITE_API_BASE=https://api-<hash>.europe-west1.run.app npm run deploy:site:cloud
 #
@@ -33,5 +33,11 @@ rm -f web/dist/assets/ort-wasm-*.wasm
 oversized=$(find web/dist -type f -size +25M)
 if [[ -n "$oversized" ]]; then echo "Files over the 25 MiB asset limit: $oversized" >&2; exit 1; fi
 node_modules/.bin/tsc --noEmit -p web/functions
-cd web
-../node_modules/.bin/wrangler pages deploy dist --project-name recipe-transcriber --branch main --commit-dirty=true
+(cd web && ../node_modules/.bin/wrangler pages deploy dist --project-name recipe-transcriber --branch main --commit-dirty=true)
+
+# Same build on Firebase Hosting (https://recipe-transcriber-eu.web.app): Google's network,
+# so it stays reachable when Spanish ISPs block Cloudflare IP ranges during LaLiga matches
+# (which takes pages.dev down there). Firebase only serves from inside its project folder,
+# hence the copy into firebase/dist (gitignored). Link previews are pages.dev-only for now.
+rm -rf firebase/dist && cp -R web/dist firebase/dist
+(cd firebase && ../node_modules/.bin/firebase deploy --only hosting --project recipe-transcriber-eu --non-interactive)

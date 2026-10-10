@@ -1,7 +1,8 @@
 # Deploying
 
 **Live since 2026-10-09: the signed-in version ("cloud" mode).** recipe-transcriber.pages.dev
-serves the cloud build; its backend is on Google Cloud (project `recipe-transcriber-eu`).
+and **recipe-transcriber-eu.web.app** (Firebase Hosting — use this one from Spain on football
+match days, when ISPs block Cloudflare IP ranges) serve the cloud build; its backend is on Google Cloud (project `recipe-transcriber-eu`).
 The anonymous Cloudflare Worker below still runs, so switching back is one `npm run deploy:site`.
 
 ## Signed-in version (Google Cloud + Cloudflare Pages)

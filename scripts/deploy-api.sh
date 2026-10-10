@@ -30,7 +30,7 @@ FREE_MONTHLY_RECIPES="${FREE_MONTHLY_RECIPES:-30}"
 EXTRACTOR_MODEL="${EXTRACTOR_MODEL:-claude-haiku-4-5}"
 VERIFIER_MODEL="${VERIFIER_MODEL:-claude-haiku-4-5}"
 SCREENING_MODEL="${SCREENING_MODEL:-claude-haiku-4-5}"
-ALLOWED_ORIGINS="${ALLOWED_ORIGINS:-https://recipe-transcriber.pages.dev}"
+ALLOWED_ORIGINS="${ALLOWED_ORIGINS:-https://recipe-transcriber.pages.dev,https://recipe-transcriber-eu.web.app,https://recipe-transcriber-eu.firebaseapp.com}"
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
