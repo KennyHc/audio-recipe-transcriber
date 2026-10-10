@@ -1,13 +1,30 @@
 import { useState, type ReactNode } from "react";
-import { Bookmark, Heart } from "lucide-react";
+import { Bookmark, Clock, Heart } from "lucide-react";
 import type { PublicRecipe } from "@recipe/shared";
 import { NoodlesLogo } from "@/components/NoodlesLogo";
 import { publicHref } from "@/lib/router";
+import { formatDuration } from "@/lib/format";
 
 /** "Recipe by {channel}" for credited sources, else "by @handle". */
 export function creditLine(pub: Pick<PublicRecipe, "source" | "handle">): string {
   if (pub.source.kind !== "own" && pub.source.channelName) return `Recipe by ${pub.source.channelName}`;
   return `by @${pub.handle}`;
+}
+
+/** The card's quiet facts: "30 min · 17 ingredients" (time only when the recipe has one). */
+export function cardFacts(recipe: Pick<PublicRecipe["recipe"], "totalTimeMinutes" | "ingredients">): string[] {
+  const facts: string[] = [];
+  if (typeof recipe.totalTimeMinutes === "number" && recipe.totalTimeMinutes > 0) {
+    facts.push(formatDuration(recipe.totalTimeMinutes));
+  }
+  const n = recipe.ingredients.length;
+  if (n > 0) facts.push(`${n} ingredient${n === 1 ? "" : "s"}`);
+  return facts;
+}
+
+/** Like/save counts only once there's something to count. */
+export function showEngagementCounts(stats: Pick<PublicRecipe["stats"], "likes" | "saves">): boolean {
+  return stats.likes > 0 || stats.saves > 0;
 }
 
 export function RecipeThumbnail({ src, className = "" }: { src: string | null; className?: string }) {
@@ -38,6 +55,8 @@ export function RecipeThumbnail({ src, className = "" }: { src: string | null; c
 }
 
 export function PublicRecipeCard({ pub, footer }: { pub: PublicRecipe; footer?: ReactNode }) {
+  const facts = cardFacts(pub.recipe);
+  const showCounts = showEngagementCounts(pub.stats);
   return (
     <div className="group relative h-full overflow-hidden rounded-[10px] border border-[hsl(var(--border))] bg-[hsl(var(--surface))] transition-all duration-150 hover:-translate-y-0.5 hover:border-[hsl(var(--border-strong))] hover:shadow-[var(--shadow-float)]">
       <a href={publicHref(pub.id)} className="flex h-full flex-col">
@@ -47,14 +66,28 @@ export function PublicRecipeCard({ pub, footer }: { pub: PublicRecipe; footer?: 
             {pub.recipe.title}
           </p>
           <p className="truncate text-sm text-[hsl(var(--ink-muted))]">{creditLine(pub)}</p>
-          <div className="mt-auto flex items-center gap-3 pt-1 text-xs tabular-nums text-[hsl(var(--ink-faint))]">
-            <span className="inline-flex items-center gap-1" aria-label={`${pub.stats.likes} likes`}>
-              <Heart className="h-3.5 w-3.5" /> {pub.stats.likes}
-            </span>
-            <span className="inline-flex items-center gap-1" aria-label={`${pub.stats.saves} saves`}>
-              <Bookmark className="h-3.5 w-3.5" /> {pub.stats.saves}
-            </span>
-          </div>
+          {(facts.length > 0 || showCounts) && (
+            <div className="mt-auto flex flex-wrap items-center gap-x-3 gap-y-1 pt-1 text-xs tabular-nums text-[hsl(var(--ink-faint))]">
+              {facts.length > 0 && (
+                <span className="inline-flex items-center gap-1">
+                  {typeof pub.recipe.totalTimeMinutes === "number" && pub.recipe.totalTimeMinutes > 0 && (
+                    <Clock className="h-3.5 w-3.5" />
+                  )}
+                  {facts.join(" · ")}
+                </span>
+              )}
+              {showCounts && (
+                <span className="ml-auto inline-flex items-center gap-3">
+                  <span className="inline-flex items-center gap-1" aria-label={`${pub.stats.likes} likes`}>
+                    <Heart className="h-3.5 w-3.5" /> {pub.stats.likes}
+                  </span>
+                  <span className="inline-flex items-center gap-1" aria-label={`${pub.stats.saves} saves`}>
+                    <Bookmark className="h-3.5 w-3.5" /> {pub.stats.saves}
+                  </span>
+                </span>
+              )}
+            </div>
+          )}
         </div>
       </a>
       {footer}

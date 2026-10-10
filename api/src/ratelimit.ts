@@ -5,7 +5,7 @@
  * read/write a counter inside a caller's Firestore transaction.
  *
  * Where they live:
- *   users/{uid}.daily.{publishes|engagements|reports}   per user (API-only doc)
+ *   users/{uid}.daily.{publishes|engagements|reports|suggestions}   per user (API-only doc)
  *   system/report-ip-{sha256(salt+ip)}                   per IP for reports (API-only)
  */
 import type { DocumentReference, DocumentSnapshot, Transaction } from "firebase-admin/firestore";
@@ -40,7 +40,7 @@ export function tryCount(state: DayCount | undefined, now: Date, limit: number):
   return { ok: true, state: { ...current, count: current.count + 1 } };
 }
 
-export type UserCounter = "publishes" | "engagements" | "reports";
+export type UserCounter = "publishes" | "engagements" | "reports" | "suggestions";
 
 /** Counts one action against a user's daily limit or throws 429 rate_limited. Pure. */
 export function countUserActionOrThrow(

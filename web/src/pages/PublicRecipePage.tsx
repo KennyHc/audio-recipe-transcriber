@@ -20,7 +20,7 @@ import { publicBank } from "@/backend";
 import { useAccountUser } from "@/lib/useAccount";
 import { exploreHref, jobHref, navigate, publicUrl } from "@/lib/router";
 import { isYouTube, timestampAction, timestampsUseful } from "@/lib/videoSeek";
-import { tagLabel } from "@/lib/publish";
+import { reviewNotice, tagLabel } from "@/lib/publish";
 import { formatDuration } from "@/lib/format";
 import { AudioAvailableContext } from "@/lib/audioAvailability";
 import type { UnitSystem } from "@/lib/units";
@@ -99,6 +99,23 @@ function Credit({ pub }: { pub: PublicRecipe }) {
       <p className="text-sm text-[hsl(var(--ink-faint))]">Transcribed by @{pub.handle}</p>
     </div>
   );
+}
+
+/** The owner's one-line status on their own public page (the fix lives on the private page). */
+function ownerBannerText(pub: PublicRecipe): string {
+  const notice = reviewNotice(pub);
+  switch (notice?.kind) {
+    case undefined:
+      return "This is your published recipe.";
+    case "flagged":
+      return "Held by the automatic check — only you can see this page. Open your private recipe to see why and change the source.";
+    case "unavailable":
+      return "We couldn't run the automatic check — a moderator will review it soon. Only you can see this page for now.";
+    case "waiting":
+      return "Waiting for a quick review — only you can see this page for now.";
+    case "hidden":
+      return "Hidden by a moderator — only you can see this page.";
+  }
 }
 
 /** The public recipe page, /r/{id} (cloud mode; works signed out). */
@@ -267,6 +284,7 @@ export function PublicRecipePage({ id }: { id: string }) {
         thumbnailUrl={source.thumbnailUrl}
         title={source.title ?? recipe.title}
         onUnavailable={() => setEmbedBlocked(true)}
+        suspended={cookOpen}
       />
     ) : source.kind === "video" && source.url ? (
       <a
@@ -297,11 +315,7 @@ export function PublicRecipePage({ id }: { id: string }) {
         <div className="no-print flex flex-wrap items-center gap-2 rounded-[10px] border border-[hsl(var(--accent-tint-strong))] bg-[hsl(var(--accent-tint))] px-4 py-2.5 text-sm text-[hsl(var(--accent-text))]">
           <PublicStatusPill pub={pub} />
           <span>
-            {pub.status === "live"
-              ? "This is your published recipe."
-              : pub.status === "review"
-                ? "Waiting for a quick review — only you can see this page for now."
-                : "Hidden — only you can see this page."}
+            {ownerBannerText(pub)}
           </span>
           <a href={jobHref(pub.id)} className="ml-auto underline underline-offset-2">
             Open your private recipe
@@ -428,6 +442,7 @@ export function PublicRecipePage({ id }: { id: string }) {
           currentTime={null}
           checkedIngredients={checked}
           onToggleIngredient={toggleIngredient}
+          audience="public"
         />
       </AudioAvailableContext.Provider>
 

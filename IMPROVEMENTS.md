@@ -46,3 +46,29 @@ that cut weak or risky ideas and ranked the rest. Nothing here is implemented ye
 2. Accuracy where users notice it most: **1, 2**.
 3. Cooking flow polish: **10, 8, 11**.
 4. Growth/quality loop: **7, 12, 5, 13**.
+
+---
+
+# Round 2 (after Phase 2 went live, 2026-10-10)
+
+Grounded in using the live bank (a chicken curry published with an egg-fried-rice link was
+held for review and its creator couldn't see why; it went public tagged Chinese/Korean).
+
+| # | Refinement | Size | Status |
+|---|---|---|---|
+| 1 | Owner sees why a recipe is in review + **Change source** | S | ✅ |
+| 2 | Wrong-link warning in the Publish dialog (Haiku compares video title vs recipe) | S | ✅ |
+| 3 | Suggested tags (same call) | S | ✅ |
+| 4 | Ask for the video link at upload, so publishing is one click | S | |
+| 5 | Link previews on web.app (move the preview function to Cloud Run) | M | |
+| 6 | Creator pages `/@handle` | M | |
+| 7 | Shopping list across saved recipes | M | |
+| 8 | Privacy-safe error reporting | S | |
+| 9 | Floating mini player on public pages (timestamps don't lose your place) | M | ✅ |
+| 10 | Explore filters as Cuisine / Meal / Diet dropdowns | S | ✅ |
+| 11 | Cards show time + ingredient count; hide zero like/save counts | S | ✅ |
+| 12 | Public pages say "notes from the video" instead of "things to double-check" | S | ✅ |
+| 13 | Nudges to grow the bank ("Publish your first recipe") | S | |
+
+Housekeeping: raise the Anthropic Console limit when usage grows; retire the anonymous
+Worker; pick a domain and point it at Firebase Hosting.

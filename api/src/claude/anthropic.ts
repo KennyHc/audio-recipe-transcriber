@@ -6,6 +6,8 @@ import {
   formatTranscriptForPrompt,
   formatVerifierUserMessage,
   SCREENING_SYSTEM,
+  PUBLISH_ASSIST_SYSTEM,
+  PublishAssistOutput,
   ScreeningOutput,
   VERIFIER_SYSTEM,
   VerifierOutput,
@@ -18,6 +20,7 @@ import {
   type ClaudeService,
   EXTRACT_MAX_TOKENS,
   SCREEN_MAX_TOKENS,
+  SUGGEST_MAX_TOKENS,
   VERIFY_MAX_TOKENS,
 } from "./types";
 
@@ -61,6 +64,14 @@ export function createAnthropicClaude(options: AnthropicClaudeOptions): ClaudeSe
         user: userMessage,
         schema: ScreeningOutput,
         maxTokens: SCREEN_MAX_TOKENS,
+      }),
+    suggest: (userMessage) =>
+      callStructuredOutput(client, {
+        model: options.screeningModel,
+        system: PUBLISH_ASSIST_SYSTEM,
+        user: userMessage,
+        schema: PublishAssistOutput,
+        maxTokens: SUGGEST_MAX_TOKENS,
       }),
   };
 }

@@ -9,6 +9,7 @@ import {
   CreateRecipeRequest,
   ImportRequest,
   PublishRequest,
+  PublishSuggestionsRequest,
   ReportRequest,
 } from "@recipe/shared";
 import type { Firestore } from "firebase-admin/firestore";
@@ -35,6 +36,7 @@ import type { PipelineDeps } from "./pipeline";
 import { adminAction, adminQueue, clientIp, createReport, isAdminToken } from "./moderation";
 import { publishRecipe, type PublicDeps, unpublishRecipe } from "./publish";
 import { createRecipe, reextractRecipe } from "./recipes";
+import { publishSuggestions } from "./suggestions";
 import { type FetchLike, MAX_SOURCE_URL_CHARS, previewSource } from "./sources";
 import {
   DEFAULT_BODY_LIMIT_BYTES,
@@ -140,6 +142,11 @@ export function createApp(deps: AppDeps): Hono<{ Variables: AuthVariables }> {
   app.post("/recipes/:id/publish", appCheck, user, async (c) => {
     const body = parseBodyOrThrow(PublishRequest, await readJsonBody(c.req.raw, PUBLIC_BODY_LIMIT_BYTES));
     return c.json(await publishRecipe(publicDeps, c.get("user"), c.req.param("id"), body), 200);
+  });
+
+  app.post("/recipes/:id/publish/suggestions", appCheck, user, async (c) => {
+    const body = parseBodyOrThrow(PublishSuggestionsRequest, await readJsonBody(c.req.raw, PUBLIC_BODY_LIMIT_BYTES));
+    return c.json(await publishSuggestions(publicDeps, c.get("user"), c.req.param("id"), body), 200);
   });
 
   app.delete("/recipes/:id/publish", appCheck, user, async (c) => {

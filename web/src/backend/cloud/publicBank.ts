@@ -152,6 +152,7 @@ export function createPublicBank({ firestore: db, api, currentUid }: PublicBankD
 
     previewSource: (url) => api.previewSource(url),
     publish: async (id, body) => (await api.publish(id, body)).publicRecipe,
+    publishSuggestions: (id, sourceUrl) => api.publishSuggestions(id, { sourceUrl }),
     unpublish: (id) => api.unpublish(id),
     setLike: (publicId, liked) => api.setLike(publicId, liked),
     setSave: (publicId, saved) => api.setSave(publicId, saved),

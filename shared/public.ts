@@ -22,6 +22,12 @@ import { Recipe } from "./recipe";
 //          Screens the text with Haiku (global budget, not the user's quota); flagged ->
 //          status "review". 409 duplicate_video / handle_taken; 422 source_unavailable;
 //          429 rate_limited (MAX_PUBLISHES_PER_DAY).
+//   POST   /recipes/:id/publish/suggestions  PublishSuggestionsRequest
+//                                         -> PublishSuggestionsResponse   owner
+//          For the Publish dialog: suggested tags, and a warning if the video link doesn't
+//          look like this recipe (wrong link). One Haiku call under the global budget;
+//          fails soft (empty suggestions, 200) — publishing never depends on it.
+//          Rate limit MAX_SUGGESTIONS_PER_DAY.
 //   DELETE /recipes/:id/publish                               -> 204   owner (or admin)
 //   POST   /public/:id/like | DELETE      -> EngagementResponse         signed in
 //   POST   /public/:id/save | DELETE      -> EngagementResponse         signed in
@@ -103,6 +109,11 @@ export const PublicRecipeDoc = z.object({
   stats: PublicStats,
   publishedAt: z.string(), // ISO; first publish
   updatedAt: z.string(), // ISO; last publish/update
+  /**
+   * Why screening held it (status "review"), shown to the owner with a way to fix it;
+   * null otherwise. Optional: snapshots published before this field existed lack it.
+   */
+  reviewReason: z.string().nullable().optional(),
 });
 export type PublicRecipeDoc = z.infer<typeof PublicRecipeDoc>;
 
@@ -167,6 +178,7 @@ export function searchTerms(recipe: Pick<Recipe, "title" | "ingredients">, tags:
 export const MAX_PUBLISHES_PER_DAY = 20; // per user, publish + update
 export const MAX_ENGAGEMENTS_PER_DAY = 300; // per user, likes + saves (toggles count)
 export const MAX_REPORTS_PER_DAY = 10; // per IP (hashed) and per user
+export const MAX_SUGGESTIONS_PER_DAY = 60; // per user, Publish-dialog suggestions
 export const EXPLORE_PAGE_SIZE = 24;
 
 // ---------------------------------------------------------------------------
@@ -211,6 +223,19 @@ export const PublishRequest = z.object({
   handle: Handle.nullable(),
 });
 export type PublishRequest = z.infer<typeof PublishRequest>;
+
+export const PublishSuggestionsRequest = z.object({
+  /** The video/page link entered so far (null for "My own recipe" or before one is typed). */
+  sourceUrl: z.string().url().max(500).nullable(),
+});
+export type PublishSuggestionsRequest = z.infer<typeof PublishSuggestionsRequest>;
+
+export const PublishSuggestionsResponse = z.object({
+  tags: z.array(Tag).max(MAX_TAGS), // ids from TAGS, best first; may be empty
+  /** e.g. "This video is “5 Minutes EASY Egg Fried Rice” — is that the right link?" */
+  creditWarning: z.string().nullable(),
+});
+export type PublishSuggestionsResponse = z.infer<typeof PublishSuggestionsResponse>;
 
 export const PublishResponse = z.object({ publicRecipe: PublicRecipe });
 export type PublishResponse = z.infer<typeof PublishResponse>;

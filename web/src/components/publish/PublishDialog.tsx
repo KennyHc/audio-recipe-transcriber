@@ -1,11 +1,20 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { Globe, Link2, Loader2, PlayCircle, User, Video } from "lucide-react";
-import { MAX_TAGS, TAGS, type PublicRecipe, type SourcePreview } from "@recipe/shared";
+import { AlertTriangle, Globe, Link2, Loader2, PlayCircle, Sparkles, User, Video } from "lucide-react";
+import {
+  MAX_TAGS,
+  TAGS,
+  type PublicRecipe,
+  type PublishSuggestionsResponse,
+  type SourcePreview,
+} from "@recipe/shared";
 import { publicBank } from "@/backend";
 import { CloudApiError } from "@/backend/cloud/errors";
 import {
   EMPTY_FORM,
+  applySuggestedTags,
+  autoSelectedTags,
   buildPublishRequest,
+  createSuggestionsLoader,
   detectVideo,
   formFromSnapshot,
   handleProblem,
@@ -13,11 +22,14 @@ import {
   normalizeUrl,
   parseOffset,
   shouldPreview,
+  suggestionKey,
+  suggestionSourceUrl,
   tagLabel,
   toggleTag,
   TAG_GROUP_LABELS,
   type PublishForm,
   type SourceKind,
+  type SuggestionsLoader,
 } from "@/lib/publish";
 import { publicHref, termsHref } from "@/lib/router";
 import { cn } from "@/lib/utils";
@@ -34,6 +46,7 @@ import {
 
 const SECTION_LABEL = "text-[12px] font-medium uppercase tracking-[0.08em] text-[hsl(var(--ink-muted))]";
 const PREVIEW_DEBOUNCE_MS = 500;
+const SUGGEST_DEBOUNCE_MS = 400;
 
 type PreviewState =
   | { status: "idle" }
@@ -138,6 +151,24 @@ export function SourcePreviewCard({ preview }: { preview: SourcePreview }) {
   );
 }
 
+/** Non-blocking "is that the right link?" note from the suggestions call. */
+function CreditWarning({ text }: { text: string }) {
+  // The API's text names the linked video ("This video is “…” — is that the right link?"), and
+  // it sits right under the preview card with the video's title and thumbnail.
+  return (
+    <div
+      role="status"
+      className="flex gap-2 rounded-[10px] border border-[hsl(var(--caution-border))] bg-[hsl(var(--caution-tint))] px-3 py-2.5 text-sm text-[hsl(var(--caution-text))]"
+    >
+      <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-[hsl(var(--caution-icon))]" />
+      <div className="min-w-0 space-y-0.5">
+        <p>{text}</p>
+        <p className="text-xs text-[hsl(var(--ink-muted))]">You can still publish — just check it's the video this recipe is from.</p>
+      </div>
+    </div>
+  );
+}
+
 export interface PublishDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -147,9 +178,19 @@ export interface PublishDialogProps {
   /** The account has no handle yet (first publish). */
   needsHandle: boolean;
   onPublished: (pub: PublicRecipe) => void;
+  /** "fixSource": opened from "Change source" on a recipe held in review (focuses the link). */
+  intent?: "details" | "fixSource";
 }
 
-export function PublishDialog({ open, onOpenChange, recipeId, existing, needsHandle, onPublished }: PublishDialogProps) {
+export function PublishDialog({
+  open,
+  onOpenChange,
+  recipeId,
+  existing,
+  needsHandle,
+  onPublished,
+  intent = "details",
+}: PublishDialogProps) {
   const [form, setForm] = useState<PublishForm>(EMPTY_FORM);
   const [preview, setPreview] = useState<PreviewState>({ status: "idle" });
   const [submitting, setSubmitting] = useState(false);
@@ -158,6 +199,11 @@ export function PublishDialog({ open, onOpenChange, recipeId, existing, needsHan
   const [handleError, setHandleError] = useState<string | null>(null);
   const [handleTouched, setHandleTouched] = useState(false);
   const previewSeq = useRef(0);
+  // Suggestions: one call per distinct source URL per opening; failures are ignored.
+  const [suggestions, setSuggestions] = useState<{ key: string; res: PublishSuggestionsResponse } | null>(null);
+  const suggestLoader = useRef<SuggestionsLoader<PublishSuggestionsResponse> | null>(null);
+  const tagsTouched = useRef(false);
+  const firstPublish = useRef(existing === null);
 
   // Fresh form each time it opens (pre-filled when editing a published recipe).
   useEffect(() => {
@@ -168,9 +214,19 @@ export function PublishDialog({ open, onOpenChange, recipeId, existing, needsHan
     setDuplicateId(null);
     setHandleError(null);
     setHandleTouched(false);
-  }, [open, existing, needsHandle]);
+    setSuggestions(null);
+    suggestLoader.current = publicBank
+      ? createSuggestionsLoader((url) => publicBank!.publishSuggestions(recipeId, url))
+      : null;
+    tagsTouched.current = false;
+    firstPublish.current = existing === null;
+  }, [open, existing, needsHandle, recipeId]);
 
   const update = (patch: Partial<PublishForm>) => setForm((f) => ({ ...f, ...patch }));
+  const setTags = (tags: string[]) => {
+    tagsTouched.current = true;
+    update({ tags });
+  };
 
   // Live preview for YouTube/TikTok links (debounced). Credit comes from the API's oEmbed lookup.
   const previewUrl = form.sourceKind === "video" && shouldPreview(form.videoUrl) ? normalizeUrl(form.videoUrl) : null;
@@ -198,6 +254,41 @@ export function PublishDialog({ open, onOpenChange, recipeId, existing, needsHan
     }, PREVIEW_DEBOUNCE_MS);
     return () => clearTimeout(timer);
   }, [open, previewUrl]);
+
+  // Suggested tags + a wrong-link check, once the source is known (the preview's canonical URL
+  // for YouTube/TikTok; the typed link otherwise; null for "My own recipe").
+  const suggestUrl = suggestionSourceUrl(form, preview.status === "ready" ? preview.preview.url : null);
+  const currentSuggestKey = suggestUrl === undefined ? null : suggestionKey(suggestUrl);
+  useEffect(() => {
+    const loader = suggestLoader.current;
+    if (!open || suggestUrl === undefined || !loader) return;
+    const key = suggestionKey(suggestUrl);
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      void loader.load(suggestUrl).then((res) => {
+        if (cancelled || !res) return; // stale (the link changed) or failed — ignore
+        setSuggestions({ key, res });
+        const auto = autoSelectedTags({
+          firstPublish: firstPublish.current,
+          userTouchedTags: tagsTouched.current,
+          suggested: res.tags,
+        });
+        if (auto) setForm((f) => ({ ...f, tags: auto }));
+      });
+    }, SUGGEST_DEBOUNCE_MS);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+    // suggestUrl is captured by its key.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, currentSuggestKey]);
+
+  const creditWarning =
+    suggestions && suggestions.key === currentSuggestKey && form.sourceKind !== "own" ? suggestions.res.creditWarning : null;
+  const suggestedTags = suggestions?.res.tags ?? [];
+  const canUseSuggested =
+    suggestedTags.some((t) => !form.tags.includes(t)) && form.tags.length < MAX_TAGS;
 
   const detected = form.sourceKind === "video" ? detectVideo(form.videoUrl) : null;
   const offsetInvalid = form.sourceKind === "video" && parseOffset(form.offsetText) === null;
@@ -246,11 +337,15 @@ export function PublishDialog({ open, onOpenChange, recipeId, existing, needsHan
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-xl gap-5">
         <DialogHeader>
-          <DialogTitle>{existing ? "Public details" : "Publish this recipe"}</DialogTitle>
+          <DialogTitle>
+            {intent === "fixSource" ? "Change the source" : existing ? "Public details" : "Publish this recipe"}
+          </DialogTitle>
           <DialogDescription>
-            {existing
-              ? "Change how this recipe is credited and shared. Saving also updates the public page to your latest version."
-              : "Share it in the public recipe bank, with credit to where it came from."}
+            {intent === "fixSource"
+              ? "Check the link to where this recipe is from. Saving publishes it again and re-runs the automatic check."
+              : existing
+                ? "Change how this recipe is credited and shared. Saving also updates the public page to your latest version."
+                : "Share it in the public recipe bank, with credit to where it came from."}
           </DialogDescription>
         </DialogHeader>
 
@@ -275,6 +370,7 @@ export function PublishDialog({ open, onOpenChange, recipeId, existing, needsHan
                 </label>
                 <Input
                   id="publish-video-url"
+                  autoFocus={intent === "fixSource"}
                   inputMode="url"
                   autoComplete="off"
                   placeholder="https://www.youtube.com/watch?v=…"
@@ -297,6 +393,9 @@ export function PublishDialog({ open, onOpenChange, recipeId, existing, needsHan
                 </p>
               )}
               {preview.status === "ready" && <SourcePreviewCard preview={preview.preview} />}
+              {creditWarning && form.sourceKind === "video" && (
+<CreditWarning text={creditWarning} />
+              )}
               {existingInBank && (
                 <div className="space-y-1 rounded-[10px] border border-[hsl(var(--caution-border))] bg-[hsl(var(--caution-tint))] px-3 py-2.5 text-sm text-[hsl(var(--caution-text))]">
                   <p className="font-medium">This video already has a recipe in the bank.</p>
@@ -363,6 +462,7 @@ export function PublishDialog({ open, onOpenChange, recipeId, existing, needsHan
                 </label>
                 <Input
                   id="publish-other-url"
+                  autoFocus={intent === "fixSource"}
                   inputMode="url"
                   placeholder="https://…"
                   value={form.otherUrl}
@@ -381,6 +481,11 @@ export function PublishDialog({ open, onOpenChange, recipeId, existing, needsHan
                   onChange={(e) => update({ otherName: e.target.value })}
                 />
               </div>
+              {creditWarning && (
+                <div className="sm:col-span-2">
+                  <CreditWarning text={creditWarning} />
+                </div>
+              )}
             </div>
           )}
         </section>
@@ -412,6 +517,47 @@ export function PublishDialog({ open, onOpenChange, recipeId, existing, needsHan
               {form.tags.length} of {MAX_TAGS}
             </span>
           </div>
+          {suggestedTags.length > 0 && (
+            <div className="space-y-1.5 rounded-[10px] border border-dashed border-[hsl(var(--accent-tint-strong))] bg-[hsl(var(--accent-tint)/0.5)] p-2.5">
+              <div className="flex items-center justify-between gap-2">
+                <p className="flex items-center gap-1.5 text-xs font-medium text-[hsl(var(--accent-text))]">
+                  <Sparkles className="h-3.5 w-3.5" /> Suggested
+                </p>
+                <button
+                  type="button"
+                  disabled={!canUseSuggested}
+                  onClick={() => setTags(applySuggestedTags(form.tags, suggestedTags))}
+                  className="rounded-full px-2 py-0.5 text-xs font-medium text-[hsl(var(--accent-text))] underline-offset-2 hover:underline disabled:no-underline disabled:opacity-50"
+                >
+                  {canUseSuggested ? "Use suggested" : "Added"}
+                </button>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {suggestedTags.map((tag) => {
+                  const on = form.tags.includes(tag);
+                  const full = !on && form.tags.length >= MAX_TAGS;
+                  return (
+                    <button
+                      key={tag}
+                      type="button"
+                      aria-pressed={on}
+                      disabled={full}
+                      onClick={() => setTags(toggleTag(form.tags, tag))}
+                      className={cn(
+                        "rounded-full border px-2.5 py-1 text-xs transition-colors disabled:opacity-40",
+                        on
+                          ? "border-[hsl(var(--accent-fill))] bg-[hsl(var(--accent-tint-strong))] text-[hsl(var(--accent-text))]"
+                          : "border-dashed border-[hsl(var(--accent-fill))] bg-[hsl(var(--surface))] text-[hsl(var(--accent-text))] hover:bg-[hsl(var(--accent-tint))]",
+                      )}
+                    >
+                      {on ? "" : "+ "}
+                      {tagLabel(tag)}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
           {(Object.keys(TAGS) as Array<keyof typeof TAGS>).map((group) => (
             <div key={group} className="space-y-1.5">
               <p className="text-xs text-[hsl(var(--ink-muted))]">{TAG_GROUP_LABELS[group]}</p>
@@ -425,7 +571,7 @@ export function PublishDialog({ open, onOpenChange, recipeId, existing, needsHan
                       type="button"
                       aria-pressed={on}
                       disabled={full}
-                      onClick={() => update({ tags: toggleTag(form.tags, tag) })}
+                      onClick={() => setTags(toggleTag(form.tags, tag))}
                       className={cn(
                         "rounded-full border px-2.5 py-1 text-xs transition-colors disabled:opacity-40",
                         on

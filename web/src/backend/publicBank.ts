@@ -5,6 +5,7 @@ import type {
   EngagementResponse,
   PublicRecipe,
   PublishRequest,
+  PublishSuggestionsResponse,
   ReportRequest,
   SourcePreview,
 } from "@recipe/shared";
@@ -46,6 +47,8 @@ export interface PublicBank {
 
   previewSource(url: string): Promise<SourcePreview>;
   publish(id: string, body: PublishRequest): Promise<PublicRecipe>;
+  /** Suggested tags + a wrong-link warning for the Publish dialog (sourceUrl null for "own"). */
+  publishSuggestions(id: string, sourceUrl: string | null): Promise<PublishSuggestionsResponse>;
   unpublish(id: string): Promise<void>;
   setLike(publicId: string, liked: boolean): Promise<EngagementResponse>;
   setSave(publicId: string, saved: boolean): Promise<EngagementResponse>;

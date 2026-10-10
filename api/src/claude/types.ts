@@ -1,4 +1,4 @@
-import type { ExtractedRecipe, RecipeWarning, ScreeningOutput, Transcript } from "@recipe/shared";
+import type { ExtractedRecipe, PublishAssistOutput, RecipeWarning, ScreeningOutput, Transcript } from "@recipe/shared";
 import type { ClaudeUsage } from "../cost";
 import { AppError } from "../errors";
 
@@ -18,6 +18,8 @@ export interface ClaudeService {
   verify(transcript: Transcript, recipe: ExtractedRecipe): Promise<ClaudeResult<RecipeWarning[]>>;
   /** Publish screening (Phase 2). `userMessage` is formatScreeningInput(...) — untrusted text. */
   screen(userMessage: string): Promise<ClaudeResult<ScreeningOutput>>;
+  /** Publish-dialog suggestions. `userMessage` is formatPublishAssistInput(...) — untrusted text. */
+  suggest(userMessage: string): Promise<ClaudeResult<PublishAssistOutput>>;
 }
 
 /** max_tokens for each call; also the worst-case output used to reserve budget. */
@@ -25,6 +27,8 @@ export const EXTRACT_MAX_TOKENS = 8000;
 export const VERIFY_MAX_TOKENS = 8000;
 /** The screening answer is one enum + one sentence. */
 export const SCREEN_MAX_TOKENS = 300;
+/** A few tag ids + one sentence. */
+export const SUGGEST_MAX_TOKENS = 300;
 
 /**
  * A response came back but was unusable (refusal, truncated, unparseable). Unlike a network

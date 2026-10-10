@@ -225,3 +225,104 @@ export function tagLabel(tag: string): string {
   const text = hyphenated ? tag : tag.replace(/-/g, " ");
   return text.replace(/(^|\s)\S/g, (c) => c.toUpperCase());
 }
+
+// ---------------------------------------------------------------------------
+// Review status, explained to the owner
+// ---------------------------------------------------------------------------
+
+/** What the API stores as reviewReason when the automatic check couldn't run (api/src/publish.ts). */
+export const SCREENING_UNAVAILABLE_REASON = "screening unavailable";
+
+export type ReviewNotice =
+  /** Screening held it with a reason; the owner can fix the source and re-publish. */
+  | { kind: "flagged"; reason: string }
+  /** The automatic check couldn't run; a moderator will look. */
+  | { kind: "unavailable" }
+  /** Held, but the snapshot predates reviewReason (or has none). */
+  | { kind: "waiting" }
+  /** Hidden by a moderator. */
+  | { kind: "hidden" };
+
+/** null when the recipe is live. */
+export function reviewNotice(pub: Pick<PublicRecipe, "status" | "reviewReason">): ReviewNotice | null {
+  if (pub.status === "hidden") return { kind: "hidden" };
+  if (pub.status !== "review") return null;
+  const reason = (pub.reviewReason ?? "").trim();
+  if (!reason) return { kind: "waiting" };
+  if (reason.toLowerCase() === SCREENING_UNAVAILABLE_REASON) return { kind: "unavailable" };
+  return { kind: "flagged", reason };
+}
+
+// ---------------------------------------------------------------------------
+// Publish-dialog suggestions (POST /recipes/:id/publish/suggestions)
+// ---------------------------------------------------------------------------
+
+/**
+ * The sourceUrl to ask suggestions for, given the form and the video preview — or undefined
+ * when we shouldn't ask yet (a YouTube/TikTok link whose preview hasn't resolved, or no link).
+ * "My own recipe" asks with null.
+ */
+export function suggestionSourceUrl(
+  form: Pick<PublishForm, "sourceKind" | "videoUrl" | "otherUrl">,
+  previewUrl: string | null,
+): string | null | undefined {
+  if (form.sourceKind === "own") return null;
+  if (form.sourceKind === "other") return normalizeUrl(form.otherUrl);
+  // A video: YouTube/TikTok wait for the preview (its canonical URL); other sites use the link.
+  if (shouldPreview(form.videoUrl)) return previewUrl ?? undefined;
+  return normalizeUrl(form.videoUrl) ?? undefined;
+}
+
+/** A stable cache key for one suggestions request ("" for null). */
+export const suggestionKey = (sourceUrl: string | null) => sourceUrl ?? "";
+
+/** "Use suggested": adds every suggested tag not already picked, up to MAX_TAGS. Never removes. */
+export function applySuggestedTags(current: readonly string[], suggested: readonly string[]): string[] {
+  const out = [...current];
+  for (const tag of suggested) {
+    if (out.length >= MAX_TAGS) break;
+    if (!out.includes(tag)) out.push(tag);
+  }
+  return out;
+}
+
+/**
+ * Tags to pre-select when suggestions arrive: only on a first publish, and only while the user
+ * hasn't touched the tags (then a newer suggestion may replace the earlier pre-selection).
+ * Returns null to leave the tags alone.
+ */
+export function autoSelectedTags(opts: {
+  firstPublish: boolean;
+  userTouchedTags: boolean;
+  suggested: readonly string[];
+}): string[] | null {
+  if (!opts.firstPublish || opts.userTouchedTags || opts.suggested.length === 0) return null;
+  return opts.suggested.slice(0, MAX_TAGS);
+}
+
+export interface SuggestionsLoader<T> {
+  /**
+   * Asks for suggestions for this source (one request per distinct URL — repeats reuse it).
+   * Resolves with the response only if this is still the latest URL asked about when it
+   * arrives; null when it's stale or the request failed (failures are ignored).
+   */
+  load(sourceUrl: string | null): Promise<T | null>;
+}
+
+export function createSuggestionsLoader<T>(fetchSuggestions: (sourceUrl: string | null) => Promise<T>): SuggestionsLoader<T> {
+  const cache = new Map<string, Promise<T | null>>();
+  let latest: string | null = null;
+  return {
+    async load(sourceUrl) {
+      const key = suggestionKey(sourceUrl);
+      latest = key;
+      let pending = cache.get(key);
+      if (!pending) {
+        pending = fetchSuggestions(sourceUrl).catch(() => null);
+        cache.set(key, pending);
+      }
+      const res = await pending;
+      return latest === key ? res : null;
+    },
+  };
+}

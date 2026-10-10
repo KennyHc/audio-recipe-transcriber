@@ -65,3 +65,17 @@ describe("matchesClientFilter", () => {
     expect(matchesClientFilter(doc, buildExploreQuery({ tab: "newest", search: "", tag: "vegan" }))).toBe(true);
   });
 });
+
+describe("tagGroupOf (Explore filter dropdowns)", () => {
+  it("finds each tag's group", async () => {
+    const { tagGroupOf, TAG_GROUPS } = await import("./explore");
+    const { TAGS } = await import("@recipe/shared");
+    expect(TAG_GROUPS).toEqual(["cuisine", "meal", "diet"]);
+    expect(tagGroupOf("indian")).toBe("cuisine");
+    expect(tagGroupOf("dessert")).toBe("meal");
+    expect(tagGroupOf("vegan")).toBe("diet");
+    expect(tagGroupOf(null)).toBeNull();
+    expect(tagGroupOf("nope")).toBeNull();
+    for (const g of TAG_GROUPS) for (const t of TAGS[g]) expect(tagGroupOf(t)).toBe(g);
+  });
+});

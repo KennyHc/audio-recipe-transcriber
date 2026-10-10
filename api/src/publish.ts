@@ -148,6 +148,8 @@ export async function publishRecipe(
       stats: existing?.stats ?? { saves: 0, likes: 0, score: 0 },
       publishedAt: existing?.publishedAt ?? nowIso,
       updatedAt: nowIso,
+      // Shown to the owner next to "In review" so they can fix it (e.g. a wrong link).
+      reviewReason: status === "review" ? screening.reason : null,
     };
 
     tx.set(pRef, doc);

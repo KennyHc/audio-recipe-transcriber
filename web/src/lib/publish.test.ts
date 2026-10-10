@@ -1,8 +1,13 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { MAX_TAGS, PublishRequest, type PublicRecipe } from "@recipe/shared";
 import {
   EMPTY_FORM,
+  applySuggestedTags,
+  autoSelectedTags,
   buildPublishRequest,
+  createSuggestionsLoader,
+  reviewNotice,
+  suggestionSourceUrl,
   detectVideo,
   formFromSnapshot,
   formatOffset,
@@ -209,5 +214,99 @@ describe("Update public version", () => {
     expect(hasUnpublishedChanges(2, snapshot())).toBe(false);
     expect(hasUnpublishedChanges(null, snapshot())).toBe(false);
     expect(hasUnpublishedChanges(3, null)).toBe(false);
+  });
+});
+
+describe("reviewNotice (why a published recipe isn't live)", () => {
+  it("live → nothing to explain", () => {
+    expect(reviewNotice(snapshot())).toBeNull();
+  });
+  it("review with a reason → flagged, with the reason", () => {
+    expect(reviewNotice(snapshot({ status: "review", reviewReason: "  The video looks unrelated.  " }))).toEqual({
+      kind: "flagged",
+      reason: "The video looks unrelated.",
+    });
+  });
+  it("screening unavailable → a moderator will look", () => {
+    expect(reviewNotice(snapshot({ status: "review", reviewReason: "screening unavailable" }))).toEqual({ kind: "unavailable" });
+    expect(reviewNotice(snapshot({ status: "review", reviewReason: "Screening Unavailable" }))).toEqual({ kind: "unavailable" });
+  });
+  it("old snapshots (no reviewReason) and null/empty → generic waiting", () => {
+    const old = snapshot({ status: "review" });
+    delete (old as Partial<PublicRecipe>).reviewReason;
+    expect(reviewNotice(old)).toEqual({ kind: "waiting" });
+    expect(reviewNotice(snapshot({ status: "review", reviewReason: null }))).toEqual({ kind: "waiting" });
+    expect(reviewNotice(snapshot({ status: "review", reviewReason: " " }))).toEqual({ kind: "waiting" });
+  });
+  it("hidden → hidden by a moderator (whatever the reason)", () => {
+    expect(reviewNotice(snapshot({ status: "hidden", reviewReason: "x" }))).toEqual({ kind: "hidden" });
+  });
+});
+
+describe("publish suggestions", () => {
+  const yt = "https://www.youtube.com/watch?v=dQw4w9WgXcQ";
+
+  it("suggestionSourceUrl: own → null; YouTube waits for the preview; other links ask directly", () => {
+    expect(suggestionSourceUrl({ ...EMPTY_FORM, sourceKind: "own" }, null)).toBeNull();
+    expect(suggestionSourceUrl({ ...EMPTY_FORM, videoUrl: yt }, null)).toBeUndefined();
+    expect(suggestionSourceUrl({ ...EMPTY_FORM, videoUrl: yt }, yt)).toBe(yt);
+    expect(suggestionSourceUrl({ ...EMPTY_FORM, videoUrl: "" }, null)).toBeUndefined();
+    expect(suggestionSourceUrl({ ...EMPTY_FORM, videoUrl: "vimeo.com/123" }, null)).toBe("https://vimeo.com/123");
+    expect(suggestionSourceUrl({ ...EMPTY_FORM, sourceKind: "other", otherUrl: "example.com/r" }, null)).toBe(
+      "https://example.com/r",
+    );
+    expect(suggestionSourceUrl({ ...EMPTY_FORM, sourceKind: "other", otherUrl: "" }, null)).toBeNull();
+  });
+
+  it("applySuggestedTags adds, never removes, and stops at MAX_TAGS", () => {
+    expect(applySuggestedTags(["vegan"], ["thai", "vegan", "dinner"])).toEqual(["vegan", "thai", "dinner"]);
+    const five = ["chinese", "dinner", "lunch", "vegan", "side"];
+    expect(applySuggestedTags(five, ["thai", "snack"])).toEqual([...five, "thai"]);
+    expect(applySuggestedTags(five, ["thai", "snack"])).toHaveLength(MAX_TAGS);
+  });
+
+  it("autoSelectedTags pre-selects only on a first publish the user hasn't touched", () => {
+    expect(autoSelectedTags({ firstPublish: true, userTouchedTags: false, suggested: ["thai", "dinner"] })).toEqual([
+      "thai",
+      "dinner",
+    ]);
+    expect(autoSelectedTags({ firstPublish: false, userTouchedTags: false, suggested: ["thai"] })).toBeNull();
+    expect(autoSelectedTags({ firstPublish: true, userTouchedTags: true, suggested: ["thai"] })).toBeNull();
+    expect(autoSelectedTags({ firstPublish: true, userTouchedTags: false, suggested: [] })).toBeNull();
+  });
+
+  it("loader: one request per distinct URL", async () => {
+    const fetch = vi.fn(async (url: string | null) => ({ tags: [url ?? "own"], creditWarning: null }));
+    const loader = createSuggestionsLoader(fetch);
+    await loader.load(yt);
+    await loader.load(null);
+    await loader.load(yt);
+    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(fetch.mock.calls.map((c) => c[0])).toEqual([yt, null]);
+  });
+
+  it("loader: a stale response (the link changed meanwhile) resolves null", async () => {
+    let release!: (v: { tags: string[]; creditWarning: string | null }) => void;
+    const fetch = vi.fn((url: string | null) =>
+      url === "https://a.test/"
+        ? new Promise<{ tags: string[]; creditWarning: string | null }>((r) => (release = r))
+        : Promise.resolve({ tags: ["thai"], creditWarning: "Wrong video?" }),
+    );
+    const loader = createSuggestionsLoader(fetch);
+    const first = loader.load("https://a.test/");
+    const second = loader.load("https://b.test/");
+    release({ tags: ["indian"], creditWarning: null });
+    expect(await first).toBeNull();
+    expect(await second).toEqual({ tags: ["thai"], creditWarning: "Wrong video?" });
+  });
+
+  it("loader: failures are ignored (null), and not retried for the same URL", async () => {
+    const fetch = vi.fn(async () => {
+      throw new Error("rate_limited");
+    });
+    const loader = createSuggestionsLoader(fetch);
+    expect(await loader.load(yt)).toBeNull();
+    expect(await loader.load(yt)).toBeNull();
+    expect(fetch).toHaveBeenCalledTimes(1);
   });
 });

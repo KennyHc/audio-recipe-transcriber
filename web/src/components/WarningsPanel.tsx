@@ -4,7 +4,20 @@ import { AlertTriangle, ChevronDown } from "lucide-react";
 import { scrollToTarget } from "@/lib/target";
 import { cn } from "@/lib/utils";
 
-export function WarningsPanel({ warnings }: { warnings: RecipeWarning[] }) {
+/** "owner": the private recipe page ("3 things to double-check"). "public": a published recipe,
+ * read by cooks — the same notes, framed as what the video didn't say exactly. */
+export type WarningsAudience = "owner" | "public";
+
+export function warningsSummary(count: number, audience: WarningsAudience): string {
+  return audience === "public"
+    ? `${count} note${count === 1 ? "" : "s"} from the video`
+    : `${count} thing${count === 1 ? "" : "s"} to double-check`;
+}
+
+export const PUBLIC_WARNINGS_INTRO =
+  "Things the video didn't say exactly — with a typical amount where we could suggest one.";
+
+export function WarningsPanel({ warnings, audience = "owner" }: { warnings: RecipeWarning[]; audience?: WarningsAudience }) {
   const [open, setOpen] = useState(false);
 
   if (warnings.length === 0) return null;
@@ -19,7 +32,7 @@ export function WarningsPanel({ warnings }: { warnings: RecipeWarning[] }) {
       >
         <span className="flex items-center gap-2 text-sm font-medium text-[hsl(var(--caution-text))]">
           <AlertTriangle className="h-4 w-4 shrink-0" />
-          {warnings.length} thing{warnings.length === 1 ? "" : "s"} to double-check
+          {warningsSummary(warnings.length, audience)}
         </span>
         <ChevronDown
           className={cn(
@@ -28,6 +41,9 @@ export function WarningsPanel({ warnings }: { warnings: RecipeWarning[] }) {
           )}
         />
       </button>
+      {open && audience === "public" && (
+        <p className="-mt-1 px-4 pb-2 pl-[2.375rem] text-xs text-[hsl(var(--ink-muted))]">{PUBLIC_WARNINGS_INTRO}</p>
+      )}
       {open && (
         <ul className="space-y-1.5 px-4 pb-3 pl-[2.375rem]">
           {warnings.map((w, i) => (

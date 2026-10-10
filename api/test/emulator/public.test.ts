@@ -8,15 +8,17 @@ import {
   MAX_ENGAGEMENTS_PER_DAY,
   MAX_PUBLISHES_PER_DAY,
   MAX_REPORTS_PER_DAY,
+  MAX_SUGGESTIONS_PER_DAY,
   type PublicRecipeDoc,
   PublishResponse,
+  PublishSuggestionsResponse,
   type Recipe,
   type RecipeDoc,
   type ReportDoc,
   SourcePreview,
 } from "@recipe/shared";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
-import { EXTRACTED, json } from "../fixtures";
+import { EXTRACTED, json, SCREEN_USAGE } from "../fixtures";
 import {
   call,
   closeAdmin,
@@ -127,6 +129,7 @@ describe.skipIf(!EMULATOR)("POST /recipes/:id/publish", () => {
       stats: { saves: 0, likes: 0, score: 0 },
       publishedAt: T0,
       updatedAt: T0,
+      reviewReason: null,
     });
     const { id: _id, ...stored } = publicRecipe;
     expect(await publicDoc(h, "recipe-a-0001")).toEqual(stored);
@@ -346,7 +349,9 @@ describe.skipIf(!EMULATOR)("POST /recipes/:id/publish", () => {
       usage: { inputTokens: 500, outputTokens: 20, cacheReadTokens: 0, cacheWriteTokens: 0 },
     });
     const res = await publish(h, alice, "recipe-a-0001");
-    expect(PublishResponse.parse(await json(res)).publicRecipe.status).toBe("review");
+    const published = PublishResponse.parse(await json(res)).publicRecipe;
+    expect(published.status).toBe("review");
+    expect(published.reviewReason).toBe("Looks like an advert."); // shown to the owner
 
     const [report, ...rest] = await reports(h);
     expect(rest).toEqual([]);
@@ -420,6 +425,61 @@ describe.skipIf(!EMULATOR)("POST /recipes/:id/publish", () => {
 
     h.clock.set("2026-10-16T00:00:01Z");
     expect((await publish(h, alice, "recipe-a-0001")).status).toBe(200);
+  });
+});
+
+describe.skipIf(!EMULATOR)("POST /recipes/:id/publish/suggestions", () => {
+  let h: Harness;
+  let alice: TestUser;
+  let bob: TestUser;
+  const suggest = (user: TestUser, body: Record<string, unknown> = { sourceUrl: `https://www.youtube.com/watch?v=${VID}` }) =>
+    call(h, user, "POST", "/recipes/recipe-a-0001/publish/suggestions", body);
+
+  beforeEach(async () => {
+    await resetEmulators();
+    h = harness();
+    alice = await signUp("alice@example.com", "Alice");
+    bob = await signUp("bob@example.com", "Bob");
+    await seedRecipe(h, alice.uid, "recipe-a-0001", "Chicken Curry");
+  });
+  afterAll(closeAdmin);
+
+  it("suggests only known tags and sends the video's oEmbed title to the model", async () => {
+    const res = await suggest(alice);
+    expect(res.status).toBe(200);
+    expect(PublishSuggestionsResponse.parse(await json(res))).toEqual({ tags: ["chinese", "dinner"], creditWarning: null });
+    expect(h.claude.suggestCalls).toBe(1);
+    expect(h.claude.suggested[0]).toContain("Recipe title: Chicken Curry");
+    expect(h.claude.suggested[0]).toMatch(/Linked video: ".+" by /);
+  });
+
+  it("returns the model's credit warning only when there is a video and it doesn't match", async () => {
+    h.claude.onSuggest = async () => ({
+      output: { tags: ["indian"], creditMatches: false, creditNote: "This video is about egg fried rice — right link?" },
+      usage: SCREEN_USAGE,
+    });
+    expect((await json(await suggest(alice))).creditWarning).toBe("This video is about egg fried rice — right link?");
+    // No link (own recipe): never a credit warning.
+    expect((await json(await suggest(alice, { sourceUrl: null }))).creditWarning).toBeNull();
+  });
+
+  it("is owner-only (404 for others) and fails soft when Claude errors", async () => {
+    expect((await suggest(bob)).status).toBe(404);
+    h.claude.onSuggest = async () => {
+      throw new Error("boom");
+    };
+    const res = await suggest(alice);
+    expect(res.status).toBe(200);
+    expect(await json(res)).toEqual({ tags: [], creditWarning: null });
+  });
+
+  it(`rate limits to ${MAX_SUGGESTIONS_PER_DAY}/day per user`, async () => {
+    await h.db.doc(`users/${alice.uid}`).set(
+      { daily: { suggestions: { day: T0.slice(0, 10), count: MAX_SUGGESTIONS_PER_DAY } } },
+      { merge: true },
+    );
+    expect((await suggest(alice)).status).toBe(429);
+    expect(h.claude.suggestCalls).toBe(0);
   });
 });
 
@@ -736,6 +796,7 @@ describe.skipIf(!EMULATOR)("admin queue + actions", () => {
     const res = await call(h, admin, "POST", "/admin/public/recipe-a-0001", { action: "restore", reportId: flag!.id, note: null });
     expect(res.status).toBe(204);
     expect((await publicDoc(h, "recipe-a-0001"))?.status).toBe("live");
+    expect((await publicDoc(h, "recipe-a-0001"))?.reviewReason).toBeNull();
     expect((await h.db.doc(`reports/${flag!.id}`).get()).data()?.resolution).toBe("restored");
   });
 

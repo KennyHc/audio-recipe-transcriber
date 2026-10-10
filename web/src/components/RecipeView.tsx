@@ -1,5 +1,5 @@
 import type { Recipe } from "@recipe/shared";
-import { WarningsPanel } from "@/components/WarningsPanel";
+import { WarningsPanel, type WarningsAudience } from "@/components/WarningsPanel";
 import { IngredientList } from "@/components/IngredientList";
 import { StepsList } from "@/components/StepsList";
 import { TipsList } from "@/components/TipsList";
@@ -13,6 +13,7 @@ export function RecipeView({
   currentTime,
   checkedIngredients,
   onToggleIngredient,
+  audience = "owner",
 }: {
   recipe: Recipe;
   unitSystem: UnitSystem;
@@ -21,10 +22,12 @@ export function RecipeView({
   currentTime: number | null;
   checkedIngredients: Set<number>;
   onToggleIngredient: (i: number) => void;
+  /** Wording of the warnings panel ("public" on published recipe pages). */
+  audience?: WarningsAudience;
 }) {
   return (
     <div className="print-area space-y-6">
-      <WarningsPanel warnings={recipe.warnings} />
+      <WarningsPanel warnings={recipe.warnings} audience={audience} />
 
       <div className="grid grid-cols-1 lg:grid-cols-[340px_1fr] gap-8">
         <section className="lg:sticky lg:top-[64px] lg:self-start lg:max-h-[calc(100vh-88px)] lg:overflow-y-auto rounded-[10px] lg:border lg:border-[hsl(var(--border-strong))] lg:bg-[hsl(var(--surface))] lg:p-4">

@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
-import { ExternalLink, Globe, Loader2, RefreshCw, Settings2, Undo2 } from "lucide-react";
+import { ExternalLink, Globe, Link2, Loader2, RefreshCw, Settings2, Undo2 } from "lucide-react";
 import type { PublicRecipe } from "@recipe/shared";
 import { account, publicBank } from "@/backend";
-import { hasUnpublishedChanges, updateRequestFromSnapshot } from "@/lib/publish";
-import { publicHref } from "@/lib/router";
+import { hasUnpublishedChanges, reviewNotice, updateRequestFromSnapshot, type ReviewNotice } from "@/lib/publish";
+import { publicHref, termsHref } from "@/lib/router";
+import { CONTACT_EMAIL } from "@/lib/contact";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -17,6 +18,46 @@ import {
 import { PublishDialog } from "./PublishDialog";
 import { PublicStatusPill } from "./PublicStatusPill";
 
+const NOTE_LINK = "text-[hsl(var(--accent-text))] underline underline-offset-2";
+
+/** Why a published recipe isn't live, in plain words (+ "Change source" when the owner can fix it). */
+export function ReviewNoticeText({ notice }: { notice: ReviewNotice }) {
+  switch (notice.kind) {
+    case "flagged":
+      return (
+        <>
+          The automatic check held this recipe: <span className="text-[hsl(var(--ink))]">{notice.reason}</span>
+          {/[.!?…]$/.test(notice.reason) ? "" : "."} If the link points to the wrong video, change the source and publish
+          again — that re-runs the check. Only you can see it until then.
+        </>
+      );
+    case "unavailable":
+      return <>We couldn't run the automatic check — a moderator will review it soon. Only you can see it until then.</>;
+    case "waiting":
+      return <>Waiting for a quick review. Only you can see it until then.</>;
+    case "hidden":
+      return (
+        <>
+          Hidden by a moderator, after a report or a creator's request — only you can see it. See the{" "}
+          <a href={termsHref()} target="_blank" rel="noreferrer" className={NOTE_LINK}>
+            Terms of use
+          </a>
+          {CONTACT_EMAIL ? (
+            <>
+              , or{" "}
+              <a href={`mailto:${CONTACT_EMAIL}`} className={NOTE_LINK}>
+                contact us
+              </a>{" "}
+              if you think this is a mistake.
+            </>
+          ) : (
+            "."
+          )}
+        </>
+      );
+  }
+}
+
 /**
  * The recipe page's publishing row (cloud mode, owner): "Publish…" before publishing; after,
  * the status pill, a link to the public page, Update public version (when the private recipe
@@ -26,6 +67,7 @@ import { PublicStatusPill } from "./PublicStatusPill";
 export function PublishControls({ recipeId, privateVersion }: { recipeId: string; privateVersion: number | null }) {
   const [pub, setPub] = useState<PublicRecipe | null | undefined>(undefined);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [dialogIntent, setDialogIntent] = useState<"details" | "fixSource">("details");
   const [needsHandle, setNeedsHandle] = useState(false);
   const [busy, setBusy] = useState<"update" | "unpublish" | "open" | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -48,7 +90,8 @@ export function PublishControls({ recipeId, privateVersion }: { recipeId: string
   if (!publicBank || pub === undefined) return null;
   const bank = publicBank;
 
-  async function openDialog() {
+  async function openDialog(intent: "details" | "fixSource" = "details") {
+    setDialogIntent(intent);
     setError(null);
     setBusy("open");
     try {
@@ -91,12 +134,13 @@ export function PublishControls({ recipeId, privateVersion }: { recipeId: string
   }
 
   const newer = hasUnpublishedChanges(privateVersion, pub);
+  const notice = pub ? reviewNotice(pub) : null;
 
   return (
     <div className="no-print space-y-1.5">
       {pub === null ? (
         <div className="flex flex-wrap items-center gap-2">
-          <Button size="sm" variant="outline" onClick={openDialog} disabled={busy === "open"}>
+          <Button size="sm" variant="outline" onClick={() => openDialog()} disabled={busy === "open"}>
             {busy === "open" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Globe className="h-3.5 w-3.5" />}
             Publish…
           </Button>
@@ -121,7 +165,7 @@ export function PublishControls({ recipeId, privateVersion }: { recipeId: string
             {busy === "update" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
             Update public version
           </Button>
-          <Button size="sm" variant="ghost" onClick={openDialog} disabled={busy !== null}>
+          <Button size="sm" variant="ghost" onClick={() => openDialog()} disabled={busy !== null}>
             <Settings2 className="h-3.5 w-3.5" /> Details
           </Button>
           <Button size="sm" variant="ghost" onClick={() => setConfirmUnpublish(true)} disabled={busy !== null}>
@@ -132,15 +176,18 @@ export function PublishControls({ recipeId, privateVersion }: { recipeId: string
       {pub && newer && (
         <p className="text-xs text-[hsl(var(--ink-faint))]">Your latest edits aren't public yet.</p>
       )}
-      {pub && pub.status === "review" && (
-        <p className="text-xs text-[hsl(var(--ink-faint))]">
-          Our automatic check flagged this for a quick human look. Only you can see it until then.
-        </p>
-      )}
-      {pub && pub.status === "hidden" && (
-        <p className="text-xs text-[hsl(var(--ink-faint))]">
-          Hidden after a report or a creator's request. Only you can see it.
-        </p>
+      {notice && (
+        <div className="space-y-2 pt-0.5">
+          <p className="max-w-[60ch] text-sm text-[hsl(var(--ink-muted))]">
+            <ReviewNoticeText notice={notice} />
+          </p>
+          {notice.kind === "flagged" && (
+            <Button size="sm" onClick={() => openDialog("fixSource")} disabled={busy !== null}>
+              {busy === "open" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Link2 className="h-3.5 w-3.5" />}
+              Change source
+            </Button>
+          )}
+        </div>
       )}
       {error && (
         <p role="alert" className="text-sm text-[hsl(var(--danger))]">
@@ -154,6 +201,7 @@ export function PublishControls({ recipeId, privateVersion }: { recipeId: string
         recipeId={recipeId}
         existing={pub}
         needsHandle={needsHandle}
+        intent={dialogIntent}
         onPublished={(p) => {
           setPub(p);
           // The handle is now set; refresh the cached /me next time.

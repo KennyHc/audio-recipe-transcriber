@@ -1,4 +1,4 @@
-import type { ExtractedRecipe, RecipeWarning, ScreeningOutput, Transcript } from "@recipe/shared";
+import type { ExtractedRecipe, PublishAssistOutput, RecipeWarning, ScreeningOutput, Transcript } from "@recipe/shared";
 import type { ClaudeResult, ClaudeService } from "../src/claude/types";
 import type { Config } from "../src/config";
 import type { ClaudeUsage } from "../src/cost";
@@ -43,6 +43,13 @@ export class FakeClaude implements ClaudeService {
   screenCalls = 0;
   /** User messages passed to screen(), in call order. */
   screened: string[] = [];
+  suggestCalls = 0;
+  /** User messages passed to suggest(), in call order. */
+  suggested: string[] = [];
+  onSuggest: () => Promise<ClaudeResult<PublishAssistOutput>> = async () => ({
+    output: { tags: ["chinese", "dinner", "not-a-tag"], creditMatches: true, creditNote: null },
+    usage: SCREEN_USAGE,
+  });
   /** Transcripts passed to extract(), in call order. */
   extractedFrom: Transcript[] = [];
   onExtract: () => Promise<ClaudeResult<ExtractedRecipe>> = async () => ({ output: EXTRACTED, usage: USAGE });
@@ -65,6 +72,11 @@ export class FakeClaude implements ClaudeService {
     this.screenCalls++;
     this.screened.push(userMessage);
     return this.onScreen();
+  }
+  suggest(userMessage: string): Promise<ClaudeResult<PublishAssistOutput>> {
+    this.suggestCalls++;
+    this.suggested.push(userMessage);
+    return this.onSuggest();
   }
 }
 

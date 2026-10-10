@@ -8,3 +8,4 @@ export * from "./proxy";
 export * from "./backup";
 export * from "./cloud";
 export * from "./public";
+export * from "./prompts/publishAssist";

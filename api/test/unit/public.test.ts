@@ -9,6 +9,7 @@ import { adjustStats, readStats } from "../../src/engagement";
 import { appError, duplicateVideoError, toErrorResponseParts } from "../../src/errors";
 import { silentLogger } from "../../src/log";
 import { clientIp, hashIp } from "../../src/moderation";
+import { toResponse } from "../../src/suggestions";
 import { readDayCount, rolloverDay, tryCount } from "../../src/ratelimit";
 import {
   fetchOEmbed,
@@ -457,5 +458,14 @@ describe("Phase 2 routes: HTTP layer", () => {
       headers: { Authorization: "Bearer good-id-token" },
     });
     expect(res.status).toBe(400);
+  });
+});
+
+describe("publish suggestions → response", () => {
+  it("keeps known tags only (lower-cased, deduped, ≤ MAX_TAGS) and drops the note without a video", () => {
+    const out = { tags: ["Indian", "dinner", "indian", "fusion", "lunch", "side", "sauce", "snack", "drink"], creditMatches: false, creditNote: " Wrong link? " };
+    expect(toResponse(out, true)).toEqual({ tags: ["indian", "dinner", "lunch", "side", "sauce", "snack"], creditWarning: "Wrong link?" });
+    expect(toResponse(out, false).creditWarning).toBeNull();
+    expect(toResponse({ ...out, creditMatches: true }, true).creditWarning).toBeNull();
   });
 });

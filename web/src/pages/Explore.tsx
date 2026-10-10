@@ -1,14 +1,61 @@
 import { useEffect, useRef, useState } from "react";
-import { Loader2, Search, X } from "lucide-react";
-import { ALL_TAGS, type PublicRecipe } from "@recipe/shared";
+import { ChevronDown, Loader2, Search, X } from "lucide-react";
+import { TAGS, type PublicRecipe } from "@recipe/shared";
 import { publicBank } from "@/backend";
-import type { ExploreTab } from "@/lib/explore";
-import { tagLabel } from "@/lib/publish";
+import { TAG_GROUPS, tagGroupOf, type ExploreTab, type TagGroup } from "@/lib/explore";
+import { TAG_GROUP_LABELS, tagLabel } from "@/lib/publish";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { PublicRecipeCard } from "@/components/public/PublicRecipeCard";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 const SEARCH_DEBOUNCE_MS = 350;
+
+const CHIP = "rounded-full border px-2.5 py-1 text-xs transition-colors";
+const CHIP_ON = "border-[hsl(var(--accent-fill))] bg-[hsl(var(--accent-tint-strong))] text-[hsl(var(--accent-text))]";
+const CHIP_OFF = "border-[hsl(var(--border-strong))] text-[hsl(var(--ink-muted))] hover:bg-[hsl(var(--accent-tint))]";
+
+/** "Cuisine ▾" — a compact button opening that group's tags. One active tag at a time. */
+function TagFilter({ group, tag, onPick }: { group: TagGroup; tag: string | null; onPick: (tag: string | null) => void }) {
+  const [open, setOpen] = useState(false);
+  const activeHere = tagGroupOf(tag) === group;
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className={cn(
+            "inline-flex h-8 items-center gap-1 rounded-full border px-3 text-sm transition-colors",
+            activeHere
+              ? "border-[hsl(var(--accent-fill))] bg-[hsl(var(--accent-tint))] text-[hsl(var(--accent-text))]"
+              : "border-[hsl(var(--border-strong))] bg-[hsl(var(--surface))] text-[hsl(var(--ink-muted))] hover:bg-[hsl(var(--accent-tint))] hover:text-[hsl(var(--ink))]",
+          )}
+        >
+          {TAG_GROUP_LABELS[group]}
+          <ChevronDown className={cn("h-3.5 w-3.5 transition-transform duration-150", open && "rotate-180")} />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent collisionPadding={16} className="w-[min(20rem,calc(100vw-2rem))] p-2.5" aria-label={`${TAG_GROUP_LABELS[group]} tags`}>
+        <div className="flex flex-wrap gap-1.5">
+          {TAGS[group].map((t) => (
+            <button
+              key={t}
+              type="button"
+              aria-pressed={tag === t}
+              onClick={() => {
+                onPick(tag === t ? null : t);
+                setOpen(false);
+              }}
+              className={cn(CHIP, tag === t ? CHIP_ON : CHIP_OFF)}
+            >
+              {tagLabel(t)}
+            </button>
+          ))}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
 
 /** The public recipe bank (cloud mode; works signed out): Newest · Popular, search, tags. */
 export function Explore() {
@@ -141,23 +188,21 @@ export function Explore() {
           )}
         </div>
 
-        <div className="-mx-4 flex gap-1.5 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0">
-          {ALL_TAGS.map((t) => (
-            <button
-              key={t}
-              type="button"
-              aria-pressed={tag === t}
-              onClick={() => setTag((cur) => (cur === t ? null : t))}
-              className={cn(
-                "shrink-0 rounded-full border px-2.5 py-1 text-xs transition-colors",
-                tag === t
-                  ? "border-[hsl(var(--accent-fill))] bg-[hsl(var(--accent-tint-strong))] text-[hsl(var(--accent-text))]"
-                  : "border-[hsl(var(--border-strong))] text-[hsl(var(--ink-muted))] hover:bg-[hsl(var(--accent-tint))]",
-              )}
-            >
-              {tagLabel(t)}
-            </button>
+        <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Filter by tag">
+          {TAG_GROUPS.map((g) => (
+            <TagFilter key={g} group={g} tag={tag} onPick={setTag} />
           ))}
+          {tag && (
+            <button
+              type="button"
+              onClick={() => setTag(null)}
+              aria-label={`Remove filter: ${tagLabel(tag)}`}
+              className={cn(CHIP, CHIP_ON, "inline-flex h-8 items-center gap-1 pl-3 pr-2 text-sm")}
+            >
+              {tagLabel(tag)}
+              <X className="h-3.5 w-3.5" />
+            </button>
+          )}
         </div>
       </div>
 

@@ -70,7 +70,7 @@ function verifyFailureReason(err: unknown): string {
  */
 export async function budgetedCall<T>(
   deps: PipelineDeps,
-  stage: "extract" | "verify" | "screen",
+  stage: "extract" | "verify" | "screen" | "suggest",
   model: string,
   inputChars: number,
   maxTokens: number,

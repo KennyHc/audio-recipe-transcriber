@@ -12,12 +12,14 @@ import {
   ImportResponse,
   MeResponse,
   PublishResponse,
+  PublishSuggestionsResponse,
   ReextractResponse,
   SourcePreview,
   type AdminActionRequest,
   type CreateRecipeRequest,
   type ImportRequest,
   type PublishRequest,
+  type PublishSuggestionsRequest,
   type ReportRequest,
 } from "@recipe/shared";
 import { CloudApiError, friendlyCloudMessage } from "./errors";
@@ -49,6 +51,8 @@ export interface ApiClient {
   // Phase 2 (shared/public.ts)
   previewSource(url: string): Promise<SourcePreview>;
   publish(id: string, body: PublishRequest): Promise<PublishResponse>;
+  /** Publish-dialog hints (suggested tags, wrong-link warning). Fails soft on the server. */
+  publishSuggestions(id: string, body: PublishSuggestionsRequest): Promise<PublishSuggestionsResponse>;
   unpublish(id: string): Promise<void>;
   setLike(publicId: string, liked: boolean): Promise<EngagementResponse>;
   setSave(publicId: string, saved: boolean): Promise<EngagementResponse>;
@@ -144,6 +148,8 @@ export function createApiClient(deps: ApiClientDeps): ApiClient {
 
     previewSource: (url) => request("GET", `/sources/preview?url=${encodeURIComponent(url)}`, SourcePreview),
     publish: (id, body) => request("POST", `/recipes/${enc(id)}/publish`, PublishResponse, body),
+    publishSuggestions: (id, body) =>
+      request("POST", `/recipes/${enc(id)}/publish/suggestions`, PublishSuggestionsResponse, body),
     unpublish: (id) => request<void>("DELETE", `/recipes/${enc(id)}/publish`, null),
     setLike: (publicId, liked) => request(liked ? "POST" : "DELETE", `/public/${enc(publicId)}/like`, EngagementResponse, liked ? {} : undefined),
     setSave: (publicId, saved) => request(saved ? "POST" : "DELETE", `/public/${enc(publicId)}/save`, EngagementResponse, saved ? {} : undefined),

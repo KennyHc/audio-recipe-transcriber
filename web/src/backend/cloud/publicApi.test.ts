@@ -67,6 +67,25 @@ describe("public bank routes", () => {
     );
   });
 
+  it("POST /recipes/:id/publish/suggestions sends the source URL and validates the response", async () => {
+    const fetchMock = vi.fn(async () =>
+      jsonResponse(200, { tags: ["chinese", "dinner"], creditWarning: "This video is “Egg Fried Rice” — is that the right link?" }),
+    );
+    const res = await client(fetchMock).publishSuggestions("r 1", { sourceUrl: "https://youtu.be/dQw4w9WgXcQ" });
+    expect(res).toEqual({ tags: ["chinese", "dinner"], creditWarning: "This video is “Egg Fried Rice” — is that the right link?" });
+    const [url, init] = (fetchMock.mock.calls as unknown as Array<[string, RequestInit]>)[0];
+    expect(url).toBe("https://api.example.test/recipes/r%201/publish/suggestions");
+    expect(init.method).toBe("POST");
+    expect(JSON.parse(String(init.body))).toEqual({ sourceUrl: "https://youtu.be/dQw4w9WgXcQ" });
+    expect((init.headers as Record<string, string>).Authorization).toBe("Bearer id-token");
+  });
+
+  it("suggestions: unknown tags in the response are rejected as a bad response", async () => {
+    const fetchMock = vi.fn(async () => jsonResponse(200, { tags: ["pizza-party"], creditWarning: null }));
+    const err = await client(fetchMock).publishSuggestions("r1", { sourceUrl: null }).catch((e: unknown) => e);
+    expect(err).toMatchObject({ code: "bad_response" });
+  });
+
   it("like/save use POST to set and DELETE to clear", async () => {
     const body = { stats: { likes: 1, saves: 0, score: 1 }, liked: true, saved: false };
     const fetchMock = vi.fn(async () => jsonResponse(200, body));

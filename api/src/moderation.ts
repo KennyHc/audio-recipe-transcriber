@@ -174,7 +174,7 @@ export async function adminAction(
       const keyRef = restoring && parsed.success ? claimedSourceRef(db, parsed.data) : null;
       const mapping = keyRef ? await tx.get(keyRef) : null;
 
-      tx.update(pRef, { status: restoring ? "live" : "hidden" });
+      tx.update(pRef, restoring ? { status: "live", reviewReason: null } : { status: "hidden" });
       if (keyRef && mapping && !mapping.exists) tx.set(keyRef, { publicRecipeId: id });
     }
 

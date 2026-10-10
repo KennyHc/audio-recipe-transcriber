@@ -10,7 +10,7 @@
 // server and filters the rest — and the tag — in the browser. With a search the order is always
 // newest (there's no terms + score index).
 
-import { EXPLORE_PAGE_SIZE, searchWords, type PublicRecipe } from "@recipe/shared";
+import { EXPLORE_PAGE_SIZE, TAGS, searchWords, type PublicRecipe } from "@recipe/shared";
 
 export type ExploreTab = "newest" | "popular";
 
@@ -79,4 +79,13 @@ export function matchesClientFilter(recipe: Pick<PublicRecipe, "terms" | "tags">
 /** True when the query is the plain, unfiltered list (the default Explore view). */
 export function isDefaultExplore(params: ExploreParams): boolean {
   return params.search.trim() === "" && params.tag === null;
+}
+
+export type TagGroup = keyof typeof TAGS;
+export const TAG_GROUPS = Object.keys(TAGS) as TagGroup[];
+
+/** Which filter dropdown (Cuisine / Meal / Diet) a tag lives in; null for an unknown tag. */
+export function tagGroupOf(tag: string | null): TagGroup | null {
+  if (!tag) return null;
+  return TAG_GROUPS.find((g) => (TAGS[g] as readonly string[]).includes(tag)) ?? null;
 }
