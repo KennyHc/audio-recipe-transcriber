@@ -5,17 +5,27 @@ import {
   ExtractedRecipe,
   formatTranscriptForPrompt,
   formatVerifierUserMessage,
+  SCREENING_SYSTEM,
+  ScreeningOutput,
   VERIFIER_SYSTEM,
   VerifierOutput,
 } from "@recipe/shared";
 import type { z } from "zod";
 import type { ClaudeUsage } from "../cost";
-import { ClaudeOutputError, type ClaudeResult, type ClaudeService, EXTRACT_MAX_TOKENS, VERIFY_MAX_TOKENS } from "./types";
+import {
+  ClaudeOutputError,
+  type ClaudeResult,
+  type ClaudeService,
+  EXTRACT_MAX_TOKENS,
+  SCREEN_MAX_TOKENS,
+  VERIFY_MAX_TOKENS,
+} from "./types";
 
 export interface AnthropicClaudeOptions {
   apiKey: string;
   extractorModel: string;
   verifierModel: string;
+  screeningModel: string;
 }
 
 /** The real ClaudeService: official SDK, shared prompts, structured outputs (ported from worker/src/llm). */
@@ -44,6 +54,14 @@ export function createAnthropicClaude(options: AnthropicClaudeOptions): ClaudeSe
       });
       return { output: output.warnings, usage };
     },
+    screen: (userMessage) =>
+      callStructuredOutput(client, {
+        model: options.screeningModel,
+        system: SCREENING_SYSTEM,
+        user: userMessage,
+        schema: ScreeningOutput,
+        maxTokens: SCREEN_MAX_TOKENS,
+      }),
   };
 }
 

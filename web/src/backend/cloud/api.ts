@@ -4,13 +4,21 @@
 
 import {
   APP_CHECK_HEADER,
+  AdminQueueResponse,
   CloudError,
+  CopyResponse,
   CreateRecipeResponse,
+  EngagementResponse,
   ImportResponse,
   MeResponse,
+  PublishResponse,
   ReextractResponse,
+  SourcePreview,
+  type AdminActionRequest,
   type CreateRecipeRequest,
   type ImportRequest,
+  type PublishRequest,
+  type ReportRequest,
 } from "@recipe/shared";
 import { CloudApiError, friendlyCloudMessage } from "./errors";
 
@@ -20,8 +28,11 @@ interface Schema<T> {
 
 export interface ApiClientDeps {
   baseUrl: string;
-  /** Resolves the signed-in user's ID token; `forceRefresh` after a reauthentication. */
-  getIdToken(forceRefresh?: boolean): Promise<string>;
+  /** Resolves the signed-in user's ID token; `forceRefresh` after a reauthentication. Throws
+   * (or resolves null) when signed out. */
+  getIdToken(forceRefresh?: boolean): Promise<string | null>;
+  /** Signed out? (For the routes that also work without an account, e.g. reports.) */
+  isSignedIn?(): boolean;
   getAppCheckToken(): Promise<string>;
   /** The monthly limit, if known, for the quota message. */
   knownLimit?(): number | undefined;
@@ -34,24 +45,51 @@ export interface ApiClient {
   importJobs(body: ImportRequest): Promise<ImportResponse>;
   getMe(): Promise<MeResponse>;
   deleteMe(options?: { forceRefreshToken?: boolean }): Promise<void>;
+
+  // Phase 2 (shared/public.ts)
+  previewSource(url: string): Promise<SourcePreview>;
+  publish(id: string, body: PublishRequest): Promise<PublishResponse>;
+  unpublish(id: string): Promise<void>;
+  setLike(publicId: string, liked: boolean): Promise<EngagementResponse>;
+  setSave(publicId: string, saved: boolean): Promise<EngagementResponse>;
+  copyPublic(publicId: string): Promise<CopyResponse>;
+  /** Works signed out (App Check only); sends the ID token when there is one. */
+  report(publicId: string, body: ReportRequest): Promise<void>;
+  adminQueue(): Promise<AdminQueueResponse>;
+  adminAction(publicId: string, body: AdminActionRequest): Promise<void>;
 }
+
+type Method = "GET" | "POST" | "DELETE";
+
+interface RequestOptions {
+  forceRefreshToken?: boolean;
+  /** "optional": send the ID token only when signed in (public routes). */
+  auth?: "required" | "optional";
+}
+
+const enc = encodeURIComponent;
 
 export function createApiClient(deps: ApiClientDeps): ApiClient {
   const base = deps.baseUrl.replace(/\/+$/, "");
   const doFetch = deps.fetch ?? ((input, init) => fetch(input, init));
 
+  async function idTokenFor(options: RequestOptions): Promise<string | null> {
+    if (options.auth === "optional" && deps.isSignedIn && !deps.isSignedIn()) return null;
+    const token = await deps.getIdToken(options.forceRefreshToken ?? false);
+    if (!token && options.auth !== "optional") throw new Error("Sign in to continue.");
+    return token || null;
+  }
+
   async function request<T>(
-    method: "GET" | "POST" | "DELETE",
+    method: Method,
     path: string,
     schema: Schema<T> | null,
     body?: unknown,
-    forceRefreshToken = false,
+    options: RequestOptions = {},
   ): Promise<T> {
-    const [idToken, appCheckToken] = await Promise.all([deps.getIdToken(forceRefreshToken), deps.getAppCheckToken()]);
-    const headers: Record<string, string> = {
-      Authorization: `Bearer ${idToken}`,
-      [APP_CHECK_HEADER]: appCheckToken,
-    };
+    const [idToken, appCheckToken] = await Promise.all([idTokenFor(options), deps.getAppCheckToken()]);
+    const headers: Record<string, string> = { [APP_CHECK_HEADER]: appCheckToken };
+    if (idToken) headers.Authorization = `Bearer ${idToken}`;
     if (body !== undefined) headers["Content-Type"] = "application/json";
 
     let response: Response;
@@ -74,9 +112,9 @@ export function createApiClient(deps: ApiClientDeps): ApiClient {
       }
       const parsed = CloudError.safeParse(payload);
       if (parsed.success) {
-        const { code, error, retryAfterSeconds } = parsed.data;
+        const { code, error, retryAfterSeconds, existingPublicId } = parsed.data;
         const message = friendlyCloudMessage(code, { serverMessage: error, retryAfterSeconds, limit: deps.knownLimit?.() });
-        throw new CloudApiError(code, message, response.status, retryAfterSeconds);
+        throw new CloudApiError(code, message, response.status, retryAfterSeconds, existingPublicId ?? null);
       }
       const fallback = response.status >= 500 ? "internal" : "bad_response";
       throw new CloudApiError(fallback, friendlyCloudMessage(fallback), response.status);
@@ -98,9 +136,20 @@ export function createApiClient(deps: ApiClientDeps): ApiClient {
 
   return {
     createRecipe: (body) => request("POST", "/recipes", CreateRecipeResponse, body),
-    reextract: (id) => request("POST", `/recipes/${encodeURIComponent(id)}/reextract`, ReextractResponse, {}),
+    reextract: (id) => request("POST", `/recipes/${enc(id)}/reextract`, ReextractResponse, {}),
     importJobs: (body) => request("POST", "/import", ImportResponse, body),
     getMe: () => request("GET", "/me", MeResponse),
-    deleteMe: (options) => request<void>("DELETE", "/me", null, undefined, options?.forceRefreshToken ?? false),
+    deleteMe: (options) =>
+      request<void>("DELETE", "/me", null, undefined, { forceRefreshToken: options?.forceRefreshToken ?? false }),
+
+    previewSource: (url) => request("GET", `/sources/preview?url=${encodeURIComponent(url)}`, SourcePreview),
+    publish: (id, body) => request("POST", `/recipes/${enc(id)}/publish`, PublishResponse, body),
+    unpublish: (id) => request<void>("DELETE", `/recipes/${enc(id)}/publish`, null),
+    setLike: (publicId, liked) => request(liked ? "POST" : "DELETE", `/public/${enc(publicId)}/like`, EngagementResponse, liked ? {} : undefined),
+    setSave: (publicId, saved) => request(saved ? "POST" : "DELETE", `/public/${enc(publicId)}/save`, EngagementResponse, saved ? {} : undefined),
+    copyPublic: (publicId) => request("POST", `/public/${enc(publicId)}/copy`, CopyResponse, {}),
+    report: (publicId, body) => request<void>("POST", `/public/${enc(publicId)}/report`, null, body, { auth: "optional" }),
+    adminQueue: () => request("GET", "/admin/queue", AdminQueueResponse),
+    adminAction: (publicId, body) => request<void>("POST", `/admin/public/${enc(publicId)}`, null, body),
   };
 }

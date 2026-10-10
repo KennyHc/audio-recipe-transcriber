@@ -45,6 +45,7 @@ function start(): void {
       apiKey: config.anthropicApiKey,
       extractorModel: config.extractorModel,
       verifierModel: config.verifierModel,
+      screeningModel: config.screeningModel,
     }),
     config,
   });
@@ -56,6 +57,7 @@ function start(): void {
       requireAppCheck: config.requireAppCheck,
       extractorModel: config.extractorModel,
       verifierModel: config.verifierModel,
+      screeningModel: config.screeningModel,
       dailyBudgetUsd: config.dailyBudgetUsd,
       freeMonthlyRecipes: config.freeMonthlyRecipes,
     });

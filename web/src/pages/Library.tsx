@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
-import type { Job, QuotaResponse } from "@recipe/shared";
-import { backend } from "@/backend";
+import type { Job, PublicRecipe, QuotaResponse } from "@recipe/shared";
+import { backend, publicBank, type SavedEntry } from "@/backend";
 import { hasApiKey } from "@/backend/settings";
 import { IS_CLOUD, IS_HOSTED } from "@/lib/mode";
 import { useAccountUser } from "@/lib/useAccount";
@@ -8,7 +8,9 @@ import { quotaExceededMessage } from "@/backend/cloud/errors";
 import { MoveLocalRecipesPrompt } from "@/components/account/MoveLocalRecipesPrompt";
 import { UploadZone } from "@/components/UploadZone";
 import { StatusBadge } from "@/components/StatusBadge";
-import { jobHref, privacyHref, settingsHref } from "@/lib/router";
+import { exploreHref, jobHref, privacyHref, settingsHref } from "@/lib/router";
+import { PublicStatusPill } from "@/components/publish/PublicStatusPill";
+import { PublicRecipeCard } from "@/components/public/PublicRecipeCard";
 import { routeIfNeedsSetup } from "@/lib/needsSetup";
 import { Button } from "@/components/ui/button";
 import {
@@ -28,7 +30,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { NoodlesLogo } from "@/components/NoodlesLogo";
 import { formatFriendlyDate } from "@/lib/format";
-import { MoreHorizontal, Trash2, KeyRound, UploadCloud, Laptop, ListChecks } from "lucide-react";
+import { MoreHorizontal, Trash2, KeyRound, UploadCloud, Laptop, ListChecks, BookmarkX } from "lucide-react";
 
 /** "3 hours" / "1 hour" — same rounding as proxyClaude.ts's describeProxyError. */
 function formatResetHours(seconds: number): string {
@@ -42,6 +44,10 @@ export function Library() {
   const [deleteTarget, setDeleteTarget] = useState<Job | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [quota, setQuota] = useState<QuotaResponse | null>(null);
+  // Cloud mode: which of my recipes are published, and the public recipes I saved.
+  const [published, setPublished] = useState<Map<string, PublicRecipe>>(new Map());
+  const [saved, setSaved] = useState<SavedEntry[] | null>(null);
+  const [removingSave, setRemovingSave] = useState<string | null>(null);
 
   const user = useAccountUser();
 
@@ -70,6 +76,31 @@ export function Library() {
       });
   }, []);
 
+  const refreshPublic = useCallback(() => {
+    if (!publicBank) return;
+    publicBank
+      .listOwnPublished()
+      .then(setPublished)
+      .catch(() => undefined);
+    publicBank
+      .listSaved()
+      .then(setSaved)
+      .catch(() => setSaved([]));
+  }, []);
+
+  async function removeSave(id: string) {
+    if (!publicBank) return;
+    setRemovingSave(id);
+    try {
+      await publicBank.setSave(id, false);
+      setSaved((prev) => (prev ?? []).filter((e) => e.id !== id));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't remove it. Please try again.");
+    } finally {
+      setRemovingSave(null);
+    }
+  }
+
   const refreshQuota = useCallback(() => {
     backend
       .getQuota()
@@ -83,7 +114,8 @@ export function Library() {
   useEffect(() => {
     refresh();
     refreshQuota();
-  }, [refresh, refreshQuota]);
+    refreshPublic();
+  }, [refresh, refreshQuota, refreshPublic]);
 
   // Cloud mode: recipes can be added from another device, so refresh when the tab comes
   // back into view (the list is served from Firestore's live cache, so this is cheap).
@@ -107,9 +139,25 @@ export function Library() {
     if (!deleteTarget) return;
     setDeleting(true);
     try {
-      await backend.deleteJob(deleteTarget.id);
+      // A published recipe is unpublished first: the rules refuse to delete a private recipe
+      // while its public snapshot exists.
+      const wasPublished = published.has(deleteTarget.id);
+      if (publicBank && wasPublished) {
+        await publicBank.unpublish(deleteTarget.id);
+      }
+      try {
+        await backend.deleteJob(deleteTarget.id);
+      } catch (err) {
+        // The published list may be stale (published from another device): unpublish, retry once.
+        if (!publicBank || wasPublished) throw err;
+        const pub = await publicBank.getPublicRecipe(deleteTarget.id).catch(() => null);
+        if (!pub) throw err;
+        await publicBank.unpublish(deleteTarget.id);
+        await backend.deleteJob(deleteTarget.id);
+      }
       setDeleteTarget(null);
       refresh();
+      refreshPublic();
     } catch (err) {
       if (routeIfNeedsSetup(err)) return;
       setError(err instanceof Error ? err.message : "Failed to delete job");
@@ -257,9 +305,10 @@ export function Library() {
                     >
                       {job.title ?? job.fileName}
                     </p>
-                    <div className="flex items-center gap-2 text-xs text-[hsl(var(--ink-faint))]">
+                    <div className="flex flex-wrap items-center gap-2 text-xs text-[hsl(var(--ink-faint))]">
                       <span>{formatFriendlyDate(job.createdAt)}</span>
                       <StatusBadge status={job.status} />
+                      {published.get(job.id) && <PublicStatusPill pub={published.get(job.id)!} />}
                     </div>
                   </div>
                 </a>
@@ -286,6 +335,51 @@ export function Library() {
         )}
       </div>
 
+      {IS_CLOUD && saved !== null && (
+        <div className="space-y-3">
+          <div className="flex items-baseline justify-between gap-2">
+            <h2 className="text-[12px] font-medium uppercase tracking-[0.08em] text-[hsl(var(--ink-muted))]">Saved</h2>
+            <a href={exploreHref()} className="text-sm text-[hsl(var(--accent-text))] underline-offset-4 hover:underline">
+              Explore recipes
+            </a>
+          </div>
+          {saved.length === 0 ? (
+            <div className="rounded-[10px] border border-dashed border-[hsl(var(--border-strong))] px-6 py-8 text-center space-y-1">
+              <p className="text-sm font-medium text-[hsl(var(--ink-muted))]">Nothing saved yet</p>
+              <p className="text-sm text-[hsl(var(--ink-faint))]">Save recipes from Explore to find them here.</p>
+            </div>
+          ) : (
+            <ul className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {saved.map((entry) => (
+                <li key={entry.id}>
+                  {entry.recipe ? (
+                    <PublicRecipeCard pub={entry.recipe} />
+                  ) : (
+                    <div className="flex h-full flex-col justify-between gap-3 rounded-[10px] border border-dashed border-[hsl(var(--border-strong))] bg-[hsl(var(--sunken))] p-4">
+                      <div className="space-y-1">
+                        <p className="font-medium text-[hsl(var(--ink-muted))]">No longer available</p>
+                        <p className="text-sm text-[hsl(var(--ink-faint))]">
+                          This recipe was unpublished or taken down.
+                        </p>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="self-start"
+                        onClick={() => removeSave(entry.id)}
+                        disabled={removingSave === entry.id}
+                      >
+                        <BookmarkX className="h-3.5 w-3.5" /> {removingSave === entry.id ? "Removing…" : "Remove"}
+                      </Button>
+                    </div>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+
       <Dialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
         <DialogContent>
           <DialogHeader>
@@ -293,6 +387,8 @@ export function Library() {
             <DialogDescription>
               This permanently deletes "{deleteTarget?.title ?? deleteTarget?.fileName}" and its
               audio, transcript, and all saved versions. This can't be undone.
+              {deleteTarget && published.has(deleteTarget.id) &&
+                " It's published, so it will also be removed from the public recipe bank."}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

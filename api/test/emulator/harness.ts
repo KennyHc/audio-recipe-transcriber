@@ -10,8 +10,8 @@ import type { Hono } from "hono";
 import { createApp } from "../../src/app";
 import type { AuthVariables } from "../../src/auth";
 import type { Config } from "../../src/config";
-import { silentLogger } from "../../src/log";
-import { FakeClaude, TestClock, testConfig } from "../fixtures";
+import type { LogFields, Logger, Severity } from "../../src/log";
+import { FakeClaude, FakeFetch, TestClock, testConfig } from "../fixtures";
 
 export const EMULATOR = Boolean(process.env.FIRESTORE_EMULATOR_HOST && process.env.FIREBASE_AUTH_EMULATOR_HOST);
 export const PROJECT_ID = process.env.GCLOUD_PROJECT ?? "demo-recipe";
@@ -43,20 +43,43 @@ export interface TestUser {
   uid: string;
   idToken: string;
   email: string;
+  /** Throwaway emulator password, so tests can sign in again (e.g. after setting claims). */
+  password: string;
 }
+
+const authBase = () => `http://${process.env.FIREBASE_AUTH_EMULATOR_HOST}/identitytoolkit.googleapis.com/v1`;
 
 /** Creates an Auth emulator user and signs in (email/password) to get a real ID token. */
 export async function signUp(email: string, displayName = "Test Cook"): Promise<TestUser> {
-  const base = `http://${process.env.FIREBASE_AUTH_EMULATOR_HOST}/identitytoolkit.googleapis.com/v1`;
   // The emulator accepts any API key; the password is a throwaway test value.
-  const res = await fetch(`${base}/accounts:signUp?key=emulator`, {
+  const password = `pw-${Math.random()}`;
+  const res = await fetch(`${authBase()}/accounts:signUp?key=emulator`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email, password: `pw-${Math.random()}`, displayName, returnSecureToken: true }),
+    body: JSON.stringify({ email, password, displayName, returnSecureToken: true }),
   });
   if (!res.ok) throw new Error(`signUp failed: ${res.status}`);
   const data = (await res.json()) as { localId: string; idToken: string };
-  return { uid: data.localId, idToken: data.idToken, email };
+  return { uid: data.localId, idToken: data.idToken, email, password };
+}
+
+/** Signs in again for a fresh ID token (picks up custom claims set since). */
+export async function signIn(user: TestUser): Promise<TestUser> {
+  const res = await fetch(`${authBase()}/accounts:signInWithPassword?key=emulator`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email: user.email, password: user.password, returnSecureToken: true }),
+  });
+  if (!res.ok) throw new Error(`signIn failed: ${res.status}`);
+  const data = (await res.json()) as { idToken: string };
+  return { ...user, idToken: data.idToken };
+}
+
+/** A signed-up user carrying the `admin: true` custom claim (as scripts/set-admin.mjs sets). */
+export async function signUpAdmin(email: string): Promise<TestUser> {
+  const user = await signUp(email, "Admin");
+  await admin().auth.setCustomUserClaims(user.uid, { admin: true });
+  return signIn(user);
 }
 
 export interface Harness {
@@ -65,12 +88,18 @@ export interface Harness {
   auth: Auth;
   claude: FakeClaude;
   clock: TestClock;
+  fetch: FakeFetch;
+  /** Everything the app logged (instead of printing it). */
+  logs: Array<{ severity: Severity; message: string; fields: LogFields }>;
 }
 
 export function harness(config: Partial<Config> = {}, clockStart = "2026-10-15T12:00:00Z"): Harness {
   const { db, auth } = admin();
   const claude = new FakeClaude();
   const clock = new TestClock(new Date(clockStart));
+  const fakeFetch = new FakeFetch();
+  const logs: Harness["logs"] = [];
+  const logger: Logger = { log: (severity, message, fields = {}) => logs.push({ severity, message, fields }) };
   const app = createApp({
     db,
     auth,
@@ -78,9 +107,10 @@ export function harness(config: Partial<Config> = {}, clockStart = "2026-10-15T1
     claude,
     config: testConfig({ requireAppCheck: false, ...config }),
     now: clock.now,
-    logger: silentLogger,
+    logger,
+    fetch: fakeFetch.fn,
   });
-  return { app, db, auth, claude, clock };
+  return { app, db, auth, claude, clock, fetch: fakeFetch, logs };
 }
 
 export function call(
@@ -89,8 +119,9 @@ export function call(
   method: string,
   path: string,
   body?: unknown,
+  extraHeaders: Record<string, string> = {},
 ): Promise<Response> {
-  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  const headers: Record<string, string> = { "Content-Type": "application/json", ...extraHeaders };
   if (user) headers.Authorization = `Bearer ${user.idToken}`;
   return Promise.resolve(
     h.app.request(path, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) }),

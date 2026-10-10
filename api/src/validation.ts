@@ -7,6 +7,8 @@ export const MB = 1024 * KB;
 /** /import carries whole libraries (no audio); everything else is one transcript. */
 export const IMPORT_BODY_LIMIT_BYTES = 10 * MB;
 export const DEFAULT_BODY_LIMIT_BYTES = 1 * MB;
+/** Publish/report/admin bodies: a few small fields. */
+export const PUBLIC_BODY_LIMIT_BYTES = 64 * KB;
 
 /** Same shape the contract requires for CreateRecipeRequest.id — also a safe Firestore doc id. */
 export const RECIPE_ID_PATTERN = /^[A-Za-z0-9_-]{8,64}$/;

@@ -8,13 +8,22 @@ export class AppError extends Error {
   /** Overrides the generic message; must be user-safe (never SDK/library text). */
   readonly userMessage: string;
 
-  constructor(code: CloudErrorCode, retryAfterSeconds: number | null = null, userMessage?: string) {
+  /** Only with code "duplicate_video": the existing public recipe for that video. */
+  readonly existingPublicId: string | null;
+
+  constructor(
+    code: CloudErrorCode,
+    retryAfterSeconds: number | null = null,
+    userMessage?: string,
+    existingPublicId: string | null = null,
+  ) {
     super(userMessage ?? GENERIC_MESSAGES[code]);
     this.name = "AppError";
     this.code = code;
     this.status = STATUS_FOR_CODE[code];
     this.retryAfterSeconds = retryAfterSeconds;
     this.userMessage = userMessage ?? GENERIC_MESSAGES[code];
+    this.existingPublicId = existingPublicId;
   }
 }
 
@@ -29,6 +38,11 @@ export const GENERIC_MESSAGES: Record<CloudErrorCode, string> = {
   budget_exhausted: "The recipe service is at its daily usage cap — try again tomorrow.",
   upstream_error: "The recipe service had a problem — please try again.",
   internal: "Something went wrong on our side — please try again.",
+  forbidden: "You don't have access to that.",
+  rate_limited: "You've done that a lot today — please try again tomorrow.",
+  handle_taken: "That handle is already taken — please pick another.",
+  duplicate_video: "This video already has a public recipe.",
+  source_unavailable: "We couldn't look up that video — it may be private, removed, or not a single video.",
 };
 
 const STATUS_FOR_CODE: Record<CloudErrorCode, number> = {
@@ -42,10 +56,20 @@ const STATUS_FOR_CODE: Record<CloudErrorCode, number> = {
   budget_exhausted: 503,
   upstream_error: 502,
   internal: 500,
+  forbidden: 403,
+  rate_limited: 429,
+  handle_taken: 409,
+  duplicate_video: 409,
+  source_unavailable: 422,
 };
 
 export function appError(code: CloudErrorCode, retryAfterSeconds: number | null = null, userMessage?: string): AppError {
   return new AppError(code, retryAfterSeconds, userMessage);
+}
+
+/** 409 duplicate_video carrying the public recipe the client should offer instead. */
+export function duplicateVideoError(existingPublicId: string): AppError {
+  return new AppError("duplicate_video", null, undefined, existingPublicId);
 }
 
 /**
@@ -57,7 +81,12 @@ export function toErrorResponseParts(err: unknown): { status: number; body: Clou
   if (err instanceof AppError) {
     return {
       status: err.status,
-      body: { error: err.userMessage, code: err.code, retryAfterSeconds: err.retryAfterSeconds },
+      body: {
+        error: err.userMessage,
+        code: err.code,
+        retryAfterSeconds: err.retryAfterSeconds,
+        ...(err.code === "duplicate_video" ? { existingPublicId: err.existingPublicId } : {}),
+      },
     };
   }
   return {

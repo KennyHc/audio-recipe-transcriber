@@ -75,7 +75,7 @@ function fakeApi(): ApiClient & { [K in keyof ApiClient]: ReturnType<typeof vi.f
       usage: { ...usage, used: 6, remaining: 24 },
     })),
     importJobs: vi.fn(async (body) => ({ imported: body.jobs.map((j: { job: Job }) => j.job.id), skipped: [] })),
-    getMe: vi.fn(async (): Promise<MeResponse> => ({ uid: UID, email: "a@example.com", plan: "free", usage })),
+    getMe: vi.fn(async (): Promise<MeResponse> => ({ uid: UID, email: "a@example.com", plan: "free", handle: null, isAdmin: false, usage })),
     deleteMe: vi.fn(async () => undefined),
   } as never;
 }

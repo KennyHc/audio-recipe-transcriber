@@ -37,8 +37,9 @@ vi.mock("firebase/firestore", () => {
     },
     where: (field: string, op: string, value: unknown) => ({ where: [field, op, value] }),
     orderBy: (field: string, dir: string) => ({ orderBy: [field, dir] }),
-    onSnapshot: (_q: unknown, next: (s: unknown) => void) => {
-      snapshotCallback = next;
+    onSnapshot: (_q: unknown, _options: unknown, next: (s: unknown) => void) => {
+      // Snapshots without metadata count as server snapshots.
+      snapshotCallback = (s) => next({ metadata: { fromCache: false }, ...(s as object) });
       return () => undefined;
     },
     getDoc: async (r: Ref) => {
@@ -98,6 +99,25 @@ describe("RecipeStore", () => {
     expect(collectionRef.path).toBe("recipes");
     expect(constraints).toEqual([{ where: ["ownerId", "==", "alice"] }, { orderBy: ["updatedAt", "desc"] }]);
     expect(warn).toHaveBeenCalledTimes(1); // the malformed doc is skipped, not fatal
+  });
+
+  it("waits for the server's snapshot, not a partial one from the local cache", async () => {
+    const store = createRecipeStore(fakeDb);
+    let done = false;
+    const pending = store.listRecipes("alice").then((list) => {
+      done = true;
+      return list;
+    });
+    const toDocs = (rs: ReturnType<typeof cloudRecipe>[]) => rs.map(({ id, ...data }) => ({ id, data: () => data }));
+    const copy = cloudRecipe("copy", "Copy", "2026-10-06T00:00:00Z");
+    const older = cloudRecipe("older", "Older", "2026-10-01T00:00:00Z");
+
+    snapshotCallback!({ metadata: { fromCache: true }, docs: toDocs([copy]) });
+    await Promise.resolve();
+    expect(done).toBe(false);
+
+    snapshotCallback!({ docs: toDocs([copy, older]) });
+    expect((await pending).map((r) => r.id)).toEqual(["copy", "older"]);
   });
 
   it("saves an edit as version n+1 plus the recipe's denormalized fields in one transaction", async () => {

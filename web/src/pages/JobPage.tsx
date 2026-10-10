@@ -20,6 +20,7 @@ import { getBrowserSettings, saveBrowserSettings } from "@/backend/settings";
 import { useWakeLock } from "@/lib/processingHealth";
 import { AudioAvailableContext } from "@/lib/audioAvailability";
 import { IS_CLOUD } from "@/lib/mode";
+import { PublishControls } from "@/components/publish/PublishControls";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
@@ -586,6 +587,11 @@ export function JobPage({ jobId, cookRoute }: { jobId: string; cookRoute: boolea
                         .filter(Boolean)
                         .join(" · ")}
                     </p>
+                    {IS_CLOUD && !isViewingOld && (
+                      <div className="pt-1">
+                        <PublishControls recipeId={jobId} privateVersion={latest?.meta.version ?? null} />
+                      </div>
+                    )}
                   </div>
 
                   <div className="no-print flex items-center gap-2 shrink-0">

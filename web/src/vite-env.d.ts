@@ -28,6 +28,9 @@ interface ImportMetaEnv {
   /** "true" = talk to the local Firebase emulators (Auth :9099, Firestore :8085) and use an App
    * Check debug token. */
   readonly VITE_USE_EMULATORS?: string;
+  /** Cloud mode: the contact / takedown email shown on the Terms and Privacy pages. Required by
+   * `npm run build:cloud` (scripts/check-no-secrets.mjs fails the build when it's empty). */
+  readonly VITE_CONTACT_EMAIL?: string;
   /** Emulator mode only: the emulators' project id (default "demo-recipe", as in firebase/package.json). */
   readonly VITE_EMULATOR_PROJECT_ID?: string;
   /** Emulator mode only: Firestore emulator port (default 8085, see firebase/firebase.json). */

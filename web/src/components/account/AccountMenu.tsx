@@ -1,9 +1,9 @@
 import { useState } from "react";
-import { LogOut, Settings as SettingsIcon } from "lucide-react";
+import { LogOut, Settings as SettingsIcon, ShieldCheck } from "lucide-react";
 import type { MeResponse } from "@recipe/shared";
 import { account, type AccountUser } from "@/backend";
 import { initialOf } from "@/lib/useAccount";
-import { navigate, settingsHref } from "@/lib/router";
+import { adminHref, navigate, settingsHref } from "@/lib/router";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -71,6 +71,7 @@ export function AccountMenu({ user }: { user: AccountUser }) {
       <DropdownMenuContent align="end" className="w-64">
         <div className="space-y-0.5 px-2.5 py-2">
           {user.displayName && <p className="truncate text-sm font-medium text-[hsl(var(--ink))]">{user.displayName}</p>}
+          {me?.handle && <p className="truncate text-sm text-[hsl(var(--ink-muted))]">@{me.handle}</p>}
           <p className="truncate text-sm text-[hsl(var(--ink-muted))]">{user.email ?? "Signed in"}</p>
           <p className="pt-1 text-xs tabular-nums text-[hsl(var(--ink-faint))]">
             {me ? usageLine(me) : usageError ? "Usage unavailable right now" : "Checking usage…"}
@@ -80,6 +81,11 @@ export function AccountMenu({ user }: { user: AccountUser }) {
         <DropdownMenuItem onSelect={() => navigate(settingsHref())}>
           <SettingsIcon className="h-3.5 w-3.5" /> Settings
         </DropdownMenuItem>
+        {me?.isAdmin && (
+          <DropdownMenuItem onSelect={() => navigate(adminHref())}>
+            <ShieldCheck className="h-3.5 w-3.5" /> Moderation
+          </DropdownMenuItem>
+        )}
         <DropdownMenuItem
           onSelect={() => {
             void account?.signOut().then(() => navigate("#/"));

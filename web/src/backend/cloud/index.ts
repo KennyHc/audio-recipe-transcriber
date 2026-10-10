@@ -4,6 +4,7 @@
 
 import type { MeResponse, Usage } from "@recipe/shared";
 import type { Account } from "../account";
+import type { PublicBank } from "../publicBank";
 import type { Backend } from "../types";
 import { createBrowserBackend } from "../browser";
 import { initFirebase } from "./firebase";
@@ -11,6 +12,7 @@ import { createApiClient } from "./api";
 import { createRecipeStore } from "./store";
 import { createCloudBackend, type UsageCache } from "./backend";
 import { createAccount } from "./account";
+import { createPublicBank } from "./publicBank";
 
 function createUsageCache(): UsageCache {
   let me: MeResponse | null = null;
@@ -25,7 +27,7 @@ function createUsageCache(): UsageCache {
   };
 }
 
-export function createCloudRuntime(): { backend: Backend; account: Account } {
+export function createCloudRuntime(): { backend: Backend; account: Account; publicBank: PublicBank } {
   const firebase = initFirebase();
   const { auth } = firebase;
   const usage = createUsageCache();
@@ -39,6 +41,7 @@ export function createCloudRuntime(): { backend: Backend; account: Account } {
       if (!user) throw new Error("Sign in to continue.");
       return user.getIdToken(forceRefresh);
     },
+    isSignedIn: () => auth.currentUser !== null,
     getAppCheckToken: firebase.getAppCheckToken,
     knownLimit: () => usage.get()?.usage.limit,
   });
@@ -62,5 +65,25 @@ export function createCloudRuntime(): { backend: Backend; account: Account } {
   });
 
   const account = createAccount({ auth, api, store, usage });
-  return { backend, account };
+
+  // The public bank works signed out too: Firestore reads need no sign-in (rules allow live
+  // public recipes), and reports need only App Check.
+  const bank = createPublicBank({
+    firestore: firebase.firestore,
+    api,
+    async currentUid() {
+      await auth.authStateReady();
+      return auth.currentUser?.uid ?? null;
+    },
+  });
+  const publicBank: PublicBank = {
+    ...bank,
+    async copy(publicId) {
+      const recipe = await bank.copy(publicId);
+      const uid = auth.currentUser?.uid;
+      if (uid) store.noteRecipe(uid, recipe); // so the library/recipe page show it right away
+      return recipe;
+    },
+  };
+  return { backend, account, publicBank };
 }

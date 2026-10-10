@@ -18,7 +18,7 @@ export interface AppCheckVerifier {
   verifyToken(appCheckToken: string): Promise<unknown>;
 }
 
-export type AuthVariables = { user: DecodedIdToken };
+export type AuthVariables = { user: DecodedIdToken; optionalUser: DecodedIdToken | null };
 
 /** Rejects requests without a valid App Check token (401 app_check_failed), unless disabled. */
 export function requireAppCheck(verifier: AppCheckVerifier, required: boolean): MiddlewareHandler {
@@ -71,6 +71,35 @@ export function requireUser(
     await next();
   };
 }
+
+/**
+ * For routes that work signed out (reports): no Authorization header → optionalUser null;
+ * a header that's present must be valid (401 otherwise), so a broken client is noticed.
+ */
+export function optionalUser(auth: AuthAdmin): MiddlewareHandler<{ Variables: AuthVariables }> {
+  return async (c, next) => {
+    const header = c.req.header("Authorization");
+    if (header === undefined || header.trim() === "") {
+      c.set("optionalUser", null);
+      await next();
+      return;
+    }
+    const match = /^Bearer\s+(\S+)\s*$/i.exec(header);
+    if (!match) throw appError("unauthenticated");
+    try {
+      c.set("optionalUser", await auth.verifyIdToken(match[1]!, false));
+    } catch {
+      throw appError("unauthenticated");
+    }
+    await next();
+  };
+}
+
+/** After requireUser: 403 forbidden unless the ID token carries the `admin` custom claim. */
+export const requireAdmin: MiddlewareHandler<{ Variables: AuthVariables }> = async (c, next) => {
+  if ((c.get("user") as { admin?: unknown }).admin !== true) throw appError("forbidden");
+  await next();
+};
 
 export function profileFromToken(token: DecodedIdToken): UserProfile {
   const name: unknown = token.name;

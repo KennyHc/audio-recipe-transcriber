@@ -35,7 +35,13 @@ service cloud.firestore {
 
     match /users/{uid} {
       allow read: if signedIn() && request.auth.uid == uid;
-      allow write: if false; // API only (usage, plan)
+      allow write: if false; // API only (usage, plan, handle)
+
+      // Phase 2: a user's own likes and saves (API writes them, so counts stay true).
+      match /{kind}/{publicId} {
+        allow read: if signedIn() && request.auth.uid == uid && kind in ['likes', 'saves'];
+        allow write: if false;
+      }
     }
 
     match /system/{docId} {
@@ -46,7 +52,9 @@ service cloud.firestore {
       // Queries must filter on ownerId == own uid.
       allow read: if signedIn() && resource.data.ownerId == request.auth.uid;
       allow create: if false; // API only (POST /recipes, /import)
-      allow delete: if signedIn() && resource.data.ownerId == request.auth.uid;
+      // Unpublish first (DELETE /recipes/:id/publish), so no public snapshot is orphaned.
+      allow delete: if signedIn() && resource.data.ownerId == request.auth.uid
+        && !exists(/databases/$(database)/documents/publicRecipes/$(recipeId));
 
       // Only as part of saving a new client version (see versions/{v} below).
       allow update: if signedIn()
@@ -99,6 +107,42 @@ service cloud.firestore {
           && request.resource.data.transcript.keys().hasOnly(['language', 'segments'])
           && request.resource.data.transcript.segments is list;
       }
+    }
+
+    // ---------------------------------------------------------------------------------
+    // Phase 2: the public recipe bank (contract: shared/public.ts). All writes go through
+    // the API; credit, counts, status, and handles can't be set from a browser.
+    // ---------------------------------------------------------------------------------
+
+    function isAdmin() {
+      return signedIn() && request.auth.token.admin == true;
+    }
+
+    match /publicRecipes/{publicId} {
+      // By id (incl. unlisted links): anyone if live; the owner and admins always.
+      allow get: if resource.data.status == 'live'
+        || (signedIn() && resource.data.ownerId == request.auth.uid)
+        || isAdmin();
+      // Queries: Explore/search must filter status == "live" && visibility == "public";
+      // owners may list their own (filter ownerId); admins anything.
+      allow list: if (resource.data.status == 'live' && resource.data.visibility == 'public')
+        || (signedIn() && resource.data.ownerId == request.auth.uid)
+        || isAdmin();
+      allow write: if false;
+    }
+
+    match /handles/{handle} {
+      allow read: if true; // who owns a handle is public ("@handle" pages later)
+      allow write: if false;
+    }
+
+    match /sources/{key} {
+      allow read: if true; // "this video already has a recipe"
+      allow write: if false;
+    }
+
+    match /reports/{reportId} {
+      allow read, write: if false; // API only (admin queue goes through /admin/queue)
     }
 
     // Anything not matched above is denied.

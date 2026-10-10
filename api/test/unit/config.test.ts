@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { ConfigError, loadConfig } from "../../src/config";
 
-const KEY = { ANTHROPIC_API_KEY: "test-key-not-real" };
+const KEY = { ANTHROPIC_API_KEY: "test-key-not-real", REPORT_SALT: "test-salt-not-real" };
 
 describe("loadConfig", () => {
   it("applies defaults", () => {
@@ -10,10 +10,12 @@ describe("loadConfig", () => {
       anthropicApiKey: "test-key-not-real",
       extractorModel: "claude-haiku-4-5",
       verifierModel: "claude-haiku-4-5",
+      screeningModel: "claude-haiku-4-5",
       dailyBudgetUsd: 2,
       freeMonthlyRecipes: 30,
       allowedOrigins: ["https://recipe-transcriber.pages.dev"],
       requireAppCheck: true,
+      reportSalt: "test-salt-not-real",
     });
   });
 
@@ -62,6 +64,19 @@ describe("loadConfig", () => {
     expect(() => loadConfig({ ...KEY, REQUIRE_APP_CHECK: "false" })).toThrow(/FIRESTORE_EMULATOR_HOST/);
     const c = loadConfig({ ...KEY, REQUIRE_APP_CHECK: "false", FIRESTORE_EMULATOR_HOST: "127.0.0.1:8080" });
     expect(c.requireAppCheck).toBe(false);
+  });
+
+  it("requires REPORT_SALT in production, with a dev fallback only against the emulator", () => {
+    expect(() => loadConfig({ ANTHROPIC_API_KEY: "k" })).toThrow(/REPORT_SALT/);
+    expect(() => loadConfig({ ANTHROPIC_API_KEY: "k", REPORT_SALT: "  " })).toThrow(/REPORT_SALT/);
+    const dev = loadConfig({ ANTHROPIC_API_KEY: "k", FIRESTORE_EMULATOR_HOST: "127.0.0.1:8080" });
+    expect(dev.reportSalt.length).toBeGreaterThan(0);
+    try {
+      loadConfig({ ANTHROPIC_API_KEY: "k", REPORT_SALT: "salty-secret", DAILY_BUDGET_USD: "x" });
+      expect.unreachable();
+    } catch (err) {
+      expect(String(err)).not.toContain("salty-secret");
+    }
   });
 
   it("adds the local Vite origins only against the emulator", () => {

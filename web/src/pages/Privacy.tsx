@@ -2,8 +2,10 @@ import type { ReactNode } from "react";
 import { ArrowLeft } from "lucide-react";
 import { backend } from "@/backend";
 import { IS_CLOUD, IS_HOSTED } from "@/lib/mode";
+import { CONTACT_EMAIL } from "@/lib/contact";
+import { termsHref } from "@/lib/router";
 
-const LAST_UPDATED = "October 4, 2026";
+const LAST_UPDATED = IS_CLOUD ? "October 9, 2026" : "October 4, 2026";
 
 function SectionLabel({ children }: { children: ReactNode }) {
   return (
@@ -88,6 +90,38 @@ export function Privacy() {
               To make a recipe, the transcript text is sent to our server (Google Cloud Run in the
               EU), which sends it to Anthropic's Claude API to extract the recipe and double-check
               it. The result is saved to your account. The audio is never uploaded.
+            </p>
+          </section>
+
+          <section className="space-y-2">
+            <SectionLabel>What's public when you publish</SectionLabel>
+            <p className="text-[hsl(var(--ink))] leading-relaxed">
+              Recipes are private unless you choose Publish. Publishing makes a public copy of the
+              recipe (title, description, ingredients, steps, tips, and its double-check notes), the
+              credit for where it came from (for videos: the title, channel, and thumbnail from YouTube
+              or TikTok), the tags you picked, and your handle, shown as “Transcribed by @you”. Your
+              email, name, photo, transcript, audio, and version history are never public. Public
+              recipes can be read by anyone, including people who aren't signed in, and search
+              engines. Unpublishing removes the public copy right away; so does deleting your account.
+            </p>
+            <p className="text-[hsl(var(--ink))] leading-relaxed">
+              The rules for publishing are in the{" "}
+              <a href={termsHref()} className="text-[hsl(var(--accent-text))] underline underline-offset-2">
+                Terms of use
+              </a>
+              . Public pages embed the creator's YouTube video from youtube-nocookie.com, which loads
+              only when the player comes into view or you press play.
+            </p>
+          </section>
+
+          <section className="space-y-2">
+            <SectionLabel>Likes, saves, and reports</SectionLabel>
+            <p className="text-[hsl(var(--ink))] leading-relaxed">
+              Which recipes you like or save is private to you; recipes only show the total counts.
+              If you report a recipe or send a creator claim, we keep the reason and (if you give one)
+              your email to handle it — they're seen only by us, never shown on the page. Reports work
+              without an account; to limit abuse, we count them per day using a one-way hash of your
+              IP address, never the address itself.
             </p>
           </section>
 
@@ -217,13 +251,22 @@ export function Privacy() {
         <SectionLabel>{IS_CLOUD ? "No ads, no tracking" : "No accounts, no ads, no tracking"}</SectionLabel>
         <p className="text-[hsl(var(--ink))] leading-relaxed">
           {IS_CLOUD
-            ? "There's no advertising, and no analytics or tracking cookies. Your recipes are never shared or made public. Your theme choice and settings live in this browser's local storage; signing in keeps a session in this browser."
+            ? "There's no advertising, and no analytics or tracking cookies. Your recipes are never shared or made public unless you publish them. Your theme choice and settings live in this browser's local storage; signing in keeps a session in this browser."
             : "There's no sign-up, no advertising, and no analytics or tracking cookies. Your theme choice and settings live in this browser's local storage, not on any server."}
         </p>
       </section>
 
       <section className="space-y-2">
         <SectionLabel>Contact</SectionLabel>
+        {IS_CLOUD && CONTACT_EMAIL && (
+          <p className="text-[hsl(var(--ink))] leading-relaxed">
+            Privacy questions, data requests, or takedowns: email{" "}
+            <a href={`mailto:${CONTACT_EMAIL}`} className="text-[hsl(var(--accent-text))] underline underline-offset-2">
+              {CONTACT_EMAIL}
+            </a>
+            .
+          </p>
+        )}
         <p className="text-[hsl(var(--ink))] leading-relaxed">
           Questions? Open an issue on{" "}
           <ExternalLink href="https://github.com/KennyHc/audio-recipe-transcriber/issues">

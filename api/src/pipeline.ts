@@ -68,9 +68,9 @@ function verifyFailureReason(err: unknown): string {
  * failures after the fact are logged, not surfaced: a stuck reservation only makes the cap
  * more conservative until the day ends.
  */
-async function budgetedCall<T>(
+export async function budgetedCall<T>(
   deps: PipelineDeps,
-  stage: "extract" | "verify",
+  stage: "extract" | "verify" | "screen",
   model: string,
   inputChars: number,
   maxTokens: number,

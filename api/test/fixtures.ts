@@ -1,7 +1,8 @@
-import type { ExtractedRecipe, RecipeWarning, Transcript } from "@recipe/shared";
+import type { ExtractedRecipe, RecipeWarning, ScreeningOutput, Transcript } from "@recipe/shared";
 import type { ClaudeResult, ClaudeService } from "../src/claude/types";
 import type { Config } from "../src/config";
 import type { ClaudeUsage } from "../src/cost";
+import type { FetchLike } from "../src/sources";
 
 export const TRANSCRIPT: Transcript = {
   language: "en",
@@ -39,10 +40,17 @@ export const USAGE: ClaudeUsage = { inputTokens: 1000, outputTokens: 500, cacheR
 export class FakeClaude implements ClaudeService {
   extractCalls = 0;
   verifyCalls = 0;
+  screenCalls = 0;
+  /** User messages passed to screen(), in call order. */
+  screened: string[] = [];
   /** Transcripts passed to extract(), in call order. */
   extractedFrom: Transcript[] = [];
   onExtract: () => Promise<ClaudeResult<ExtractedRecipe>> = async () => ({ output: EXTRACTED, usage: USAGE });
   onVerify: () => Promise<ClaudeResult<RecipeWarning[]>> = async () => ({ output: VERIFIER_WARNINGS, usage: USAGE });
+  onScreen: () => Promise<ClaudeResult<ScreeningOutput>> = async () => ({
+    output: { decision: "ok", reason: "ordinary recipe" },
+    usage: SCREEN_USAGE,
+  });
 
   extract(transcript: Transcript): Promise<ClaudeResult<ExtractedRecipe>> {
     this.extractCalls++;
@@ -53,6 +61,62 @@ export class FakeClaude implements ClaudeService {
     this.verifyCalls++;
     return this.onVerify();
   }
+  screen(userMessage: string): Promise<ClaudeResult<ScreeningOutput>> {
+    this.screenCalls++;
+    this.screened.push(userMessage);
+    return this.onScreen();
+  }
+}
+
+export const SCREEN_USAGE: ClaudeUsage = { inputTokens: 600, outputTokens: 20, cacheReadTokens: 0, cacheWriteTokens: 0 };
+
+/**
+ * Fake outgoing fetch: answers the YouTube/TikTok oEmbed endpoints and TikTok short-link
+ * redirects from in-memory tables, and records every URL. Anything else → throws, so a test
+ * that would hit some other host fails loudly.
+ */
+export class FakeFetch {
+  calls: string[] = [];
+  /** Video ids whose oEmbed lookup returns this status (default: 200 with generated credit). */
+  oembedStatus = new Map<string, number>();
+  /** Short-link URL → Location header of a 301. */
+  redirects = new Map<string, string>();
+  /** Makes every call fail like a network error/timeout. */
+  down = false;
+
+  fn: FetchLike = async (input) => {
+    this.calls.push(input);
+    if (this.down) throw new Error("network down");
+    const url = new URL(input);
+    if (url.origin === "https://www.youtube.com" && url.pathname === "/oembed") {
+      const id = new URL(url.searchParams.get("url")!).searchParams.get("v")!;
+      return this.oembed(id, {
+        title: `Fried rice video ${id}`,
+        author_name: "Chef YouTube",
+        author_url: "https://www.youtube.com/@chef",
+        thumbnail_url: `https://i.ytimg.com/vi/${id}/hqdefault.jpg`,
+      });
+    }
+    if (url.origin === "https://www.tiktok.com" && url.pathname === "/oembed") {
+      const target = new URL(url.searchParams.get("url")!);
+      const id = target.pathname.split("/").pop()!;
+      return this.oembed(id, {
+        title: `TikTok noodles ${id}`,
+        author_name: "Chef TikTok",
+        author_url: "https://www.tiktok.com/@cheftok",
+        thumbnail_url: `https://p16.tiktokcdn.com/${id}.jpeg`,
+      });
+    }
+    const location = this.redirects.get(input);
+    if (location) return new Response(null, { status: 301, headers: { Location: location } });
+    throw new Error(`FakeFetch: unexpected request to ${url.host}`);
+  };
+
+  private oembed(id: string, body: Record<string, string>): Response {
+    const status = this.oembedStatus.get(id) ?? 200;
+    if (status !== 200) return new Response("nope", { status });
+    return new Response(JSON.stringify(body), { status: 200, headers: { "Content-Type": "application/json" } });
+  }
 }
 
 export function testConfig(overrides: Partial<Config> = {}): Config {
@@ -60,10 +124,12 @@ export function testConfig(overrides: Partial<Config> = {}): Config {
     anthropicApiKey: "test-key-not-real",
     extractorModel: "claude-haiku-4-5",
     verifierModel: "claude-haiku-4-5",
+    screeningModel: "claude-haiku-4-5",
     dailyBudgetUsd: 2,
     freeMonthlyRecipes: 3,
     allowedOrigins: ["https://recipe-transcriber.pages.dev"],
     requireAppCheck: false,
+    reportSalt: "test-salt-not-real",
     ...overrides,
   };
 }

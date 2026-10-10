@@ -4,7 +4,7 @@ import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { scan } from "./check-no-secrets.mjs";
+import { missingCloudEnv, parseDotenv, resolveViteEnv, scan } from "./check-no-secrets.mjs";
 
 const SCRIPT_PATH = join(dirname(fileURLToPath(import.meta.url)), "check-no-secrets.mjs");
 
@@ -103,5 +103,44 @@ describe("CLI (--dir, --hosted, exit codes)", () => {
     const result = spawnSync("node", [SCRIPT_PATH, "--dir", join(dir, "does-not-exist")], { encoding: "utf8" });
     expect(result.status).toBe(1);
     expect(result.stderr).toMatch(/does not exist/);
+  });
+});
+
+describe("cloud build env (VITE_CONTACT_EMAIL)", () => {
+  it("parses dotenv lines with quotes and comments", () => {
+    expect(parseDotenv('# c\nA=1\nB="two words"\nC=x # note\nexport D=4\n')).toEqual({ A: "1", B: "two words", C: "x", D: "4" });
+  });
+
+  it("resolves like Vite: process env, then .env.cloud.local, .env.cloud, .env.local, .env", () => {
+    write(".env", "VITE_CONTACT_EMAIL=base@example.com");
+    write(".env.cloud", "VITE_CONTACT_EMAIL=mode@example.com");
+    expect(resolveViteEnv("VITE_CONTACT_EMAIL", { mode: "cloud", dir, env: {} })).toBe("mode@example.com");
+    write(".env.cloud.local", "VITE_CONTACT_EMAIL=local@example.com");
+    expect(resolveViteEnv("VITE_CONTACT_EMAIL", { mode: "cloud", dir, env: {} })).toBe("local@example.com");
+    expect(resolveViteEnv("VITE_CONTACT_EMAIL", { mode: "cloud", dir, env: { VITE_CONTACT_EMAIL: "env@example.com" } })).toBe(
+      "env@example.com",
+    );
+  });
+
+  it("reports an empty or missing contact email", () => {
+    expect(missingCloudEnv({ dir, env: {} })).toEqual(["VITE_CONTACT_EMAIL"]);
+    write(".env.cloud.local", "VITE_CONTACT_EMAIL=");
+    expect(missingCloudEnv({ dir, env: {} })).toEqual(["VITE_CONTACT_EMAIL"]);
+    expect(missingCloudEnv({ dir, env: { VITE_CONTACT_EMAIL: "me@example.com" } })).toEqual([]);
+  });
+
+  it("--cloud exits 1 when it's empty and 0 when it's set", () => {
+    write("index.html", "<!doctype html><html></html>");
+    const empty = spawnSync("node", [SCRIPT_PATH, "--dir", dir, "--cloud"], {
+      encoding: "utf8",
+      env: { ...process.env, VITE_CONTACT_EMAIL: "" },
+    });
+    expect(empty.status).toBe(1);
+    expect(empty.stderr).toMatch(/VITE_CONTACT_EMAIL is empty/);
+    const set = spawnSync("node", [SCRIPT_PATH, "--dir", dir, "--cloud"], {
+      encoding: "utf8",
+      env: { ...process.env, VITE_CONTACT_EMAIL: "me@example.com" },
+    });
+    expect(set.status).toBe(0);
   });
 });

@@ -13,7 +13,7 @@
     "build:browser": "VITE_BACKEND=browser tsc --noEmit && VITE_BACKEND=browser vite build",
     "build:hosted": "VITE_BACKEND=hosted tsc --noEmit && VITE_BACKEND=hosted vite build --mode hosted && node scripts/check-no-secrets.mjs --hosted",
     "build:cloud": "VITE_BACKEND=cloud tsc --noEmit && VITE_BACKEND=cloud vite build --mode cloud && node scripts/check-no-secrets.mjs --cloud",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p functions",
     "preview": "vite preview",
     "preview:browser": "npm run build:browser && vite preview --port 5182 --strictPort",
     "preview:hosted": "npm run build:hosted && vite preview --port 5183 --strictPort",

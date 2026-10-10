@@ -163,6 +163,8 @@ export const MeResponse = z.object({
   uid: z.string(),
   email: z.string().nullable(),
   plan: Plan,
+  handle: z.string().nullable(), // Phase 2: chosen on first publish (users/{uid}.handle)
+  isAdmin: z.boolean(), // Phase 2: the ID token's `admin` custom claim
   usage: Usage,
 });
 export type MeResponse = z.infer<typeof MeResponse>;
@@ -178,6 +180,12 @@ export const CloudErrorCode = z.enum([
   "budget_exhausted", // 503: the app's daily spend cap is reached for everyone
   "upstream_error", // 502: Claude call failed (refusal, max_tokens, API error)
   "internal", // 500
+  // Phase 2 (shared/public.ts)
+  "forbidden", // 403: e.g. admin route without the admin claim
+  "rate_limited", // 429: too many publishes / likes / reports today (not the monthly quota)
+  "handle_taken", // 409: the requested handle belongs to someone else
+  "duplicate_video", // 409: this video already has a public recipe (see existingPublicId)
+  "source_unavailable", // 422: the video link couldn't be looked up (private, removed, bad URL)
 ]);
 export type CloudErrorCode = z.infer<typeof CloudErrorCode>;
 
@@ -185,5 +193,7 @@ export const CloudError = z.object({
   error: z.string(), // human-readable, safe to show the user
   code: CloudErrorCode,
   retryAfterSeconds: z.number().nullable(),
+  /** Only with code "duplicate_video": the existing public recipe for that video. */
+  existingPublicId: z.string().nullable().optional(),
 });
 export type CloudError = z.infer<typeof CloudError>;

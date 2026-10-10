@@ -4,10 +4,17 @@ export interface Config {
   anthropicApiKey: string;
   extractorModel: string;
   verifierModel: string;
+  /** Publish screening (Phase 2); counts toward the daily budget, not the user's quota. */
+  screeningModel: string;
   dailyBudgetUsd: number;
   freeMonthlyRecipes: number;
   allowedOrigins: string[];
   requireAppCheck: boolean;
+  /**
+   * Salt for hashing reporter IPs (per-IP report rate limit) — the raw IP is never stored.
+   * Required in production (Secret Manager `report-salt`); a fixed dev value on emulators.
+   */
+  reportSalt: string;
 }
 
 /** Thrown at startup; the message names the variable but never echoes its value. */
@@ -20,6 +27,8 @@ export class ConfigError extends Error {
 
 const DEFAULT_MODEL = "claude-haiku-4-5";
 const DEFAULT_ORIGINS = ["https://recipe-transcriber.pages.dev"];
+/** Emulator-only fallback for REPORT_SALT (local data, nothing to protect). */
+const DEV_REPORT_SALT = "dev-report-salt-emulator-only";
 /** Vite dev/preview ports (web/package.json), allowed only when running against emulators. */
 const DEV_ORIGINS = [5180, 5181, 5182, 5183, 5184].map((p) => `http://localhost:${p}`);
 
@@ -42,6 +51,9 @@ export function loadConfig(env: Env): Config {
     throw new ConfigError("REQUIRE_APP_CHECK=false is only allowed with FIRESTORE_EMULATOR_HOST set");
   }
 
+  const reportSalt = (env.REPORT_SALT ?? "").trim() || (emulator ? DEV_REPORT_SALT : "");
+  if (!reportSalt) throw new ConfigError("REPORT_SALT is not set");
+
   const configuredOrigins = isSet(env.ALLOWED_ORIGINS)
     ? env
         .ALLOWED_ORIGINS!.split(",")
@@ -54,10 +66,12 @@ export function loadConfig(env: Env): Config {
     anthropicApiKey,
     extractorModel: nonEmptyOr(env.EXTRACTOR_MODEL, DEFAULT_MODEL),
     verifierModel: nonEmptyOr(env.VERIFIER_MODEL, DEFAULT_MODEL),
+    screeningModel: nonEmptyOr(env.SCREENING_MODEL, DEFAULT_MODEL),
     dailyBudgetUsd: parseNumber(env.DAILY_BUDGET_USD, DEFAULT_DAILY_BUDGET_USD, "DAILY_BUDGET_USD"),
     freeMonthlyRecipes: parseNumber(env.FREE_MONTHLY_RECIPES, FREE_MONTHLY_RECIPES, "FREE_MONTHLY_RECIPES"),
     allowedOrigins,
     requireAppCheck,
+    reportSalt,
   };
   assertValidConfig(config);
   return config;
@@ -66,7 +80,10 @@ export function loadConfig(env: Env): Config {
 /** Also called by createApp, so a hand-built config (tests, future wiring) is held to the same bar. */
 export function assertValidConfig(config: Config): void {
   if (!config.anthropicApiKey.trim()) throw new ConfigError("anthropicApiKey is empty");
-  if (!config.extractorModel || !config.verifierModel) throw new ConfigError("model name is empty");
+  if (!config.extractorModel || !config.verifierModel || !config.screeningModel) {
+    throw new ConfigError("model name is empty");
+  }
+  if (!config.reportSalt.trim()) throw new ConfigError("reportSalt is empty");
   if (!Number.isFinite(config.dailyBudgetUsd) || config.dailyBudgetUsd < 0) {
     throw new ConfigError("DAILY_BUDGET_USD must be a non-negative number");
   }

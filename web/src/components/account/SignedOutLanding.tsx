@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { UploadCloud, Laptop, ListChecks, ShieldCheck, Cloud, History } from "lucide-react";
+import { UploadCloud, Laptop, ListChecks, ShieldCheck, Cloud, History, Compass } from "lucide-react";
 import { SignInPanel } from "@/components/account/SignInPanel";
-import { privacyHref } from "@/lib/router";
+import { exploreHref, privacyHref } from "@/lib/router";
+import { Button } from "@/components/ui/button";
 import { consumeAccountDeleted } from "@/lib/accountPrefs";
 
 const HOW_IT_WORKS = [
@@ -56,6 +57,14 @@ export function SignedOutLanding() {
               Upload one audio recording of someone talking through a recipe — get a structured,
               verifiable recipe back, with every quantity linked to the moment it was said.
             </p>
+            <div className="flex flex-wrap items-center gap-3 pt-1">
+              <Button asChild variant="outline">
+                <a href={exploreHref()}>
+                  <Compass className="h-4 w-4" /> Browse recipes
+                </a>
+              </Button>
+              <span className="text-sm text-[hsl(var(--ink-muted))]">No account needed to cook.</span>
+            </div>
             <p className="text-xs text-[hsl(var(--ink-faint))]">
               Audio stays on your device.{" "}
               <a

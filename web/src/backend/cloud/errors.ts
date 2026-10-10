@@ -14,6 +14,8 @@ export class CloudApiError extends Error {
     message: string,
     readonly status: number,
     readonly retryAfterSeconds: number | null = null,
+    /** Only with code "duplicate_video": the public recipe that already exists for the video. */
+    readonly existingPublicId: string | null = null,
   ) {
     super(message);
     this.name = "CloudApiError";
@@ -37,6 +39,16 @@ export function nextMonthStart(now: Date = new Date()): Date {
 
 export function quotaExceededMessage(limit: number, resetsAt: Date, now: Date = new Date()): string {
   return `You've used your ${limit} free recipes this month. They reset on ${formatResetDate(resetsAt, now)}.`;
+}
+
+/** "3 hours" / "1 hour" / "20 minutes". */
+export function formatWait(seconds: number): string {
+  if (seconds < 3600) {
+    const minutes = Math.max(1, Math.round(seconds / 60));
+    return `${minutes} minute${minutes === 1 ? "" : "s"}`;
+  }
+  const hours = Math.round(seconds / 3600);
+  return `${hours} hour${hours === 1 ? "" : "s"}`;
 }
 
 export interface FriendlyMessageContext {
@@ -75,6 +87,18 @@ export function friendlyCloudMessage(code: CloudFailureCode, ctx: FriendlyMessag
     case "internal":
     case "bad_response":
       return "Something went wrong on our side. Please try again.";
+    case "forbidden":
+      return "You don't have permission to do that.";
+    case "rate_limited":
+      return ctx.retryAfterSeconds != null && ctx.retryAfterSeconds > 0
+        ? `You've done that a lot today. Try again in ${formatWait(ctx.retryAfterSeconds)}.`
+        : "You've done that a lot today. Try again tomorrow.";
+    case "handle_taken":
+      return "That handle is taken — try another.";
+    case "duplicate_video":
+      return "This video already has a recipe in the bank.";
+    case "source_unavailable":
+      return "We couldn't find that video — is it public?";
     case "conflict":
     case "bad_request":
     default:

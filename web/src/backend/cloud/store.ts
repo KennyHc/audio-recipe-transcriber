@@ -78,6 +78,7 @@ export function createRecipeStore(db: Firestore): RecipeStore {
 
   // One live query per signed-in user, started lazily by listRecipes. The library mounts on
   // every visit, so after the first load it renders straight from this cache.
+  const LIVE_SERVER_WAIT_MS = 4000;
   let live: {
     uid: string;
     recipes: Map<string, CloudRecipe>;
@@ -104,17 +105,26 @@ export function createRecipeStore(db: Firestore): RecipeStore {
       ready,
       unsubscribe: () => undefined as void,
     };
+    // The first snapshot can come from the local cache and hold only the recipes this page
+    // has already touched (e.g. a just-made copy), so "ready" waits for the server's answer.
+    // Offline, fall back to whatever the cache has after a few seconds.
+    const offlineFallback = setTimeout(resolveReady, LIVE_SERVER_WAIT_MS);
     state.unsubscribe = onSnapshot(
       q,
+      { includeMetadataChanges: true },
       (snap) => {
         recipes.clear();
         for (const d of snap.docs) {
           const r = parseRecipe(d.id, d.data());
           if (r) recipes.set(r.id, r);
         }
-        resolveReady();
+        if (!snap.metadata.fromCache) {
+          clearTimeout(offlineFallback);
+          resolveReady();
+        }
       },
       (err) => {
+        clearTimeout(offlineFallback);
         rejectReady(err);
         // The listener is dead after an error; start a fresh one on the next listRecipes.
         if (live === state) live = null;

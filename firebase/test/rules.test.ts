@@ -292,3 +292,150 @@ describe("deleting", () => {
     await assertFails(deleteDoc(doc(db, "recipes/r1/private/transcript")));
   });
 });
+
+// ---------------------------------------------------------------------------------------
+// Phase 2: the public recipe bank
+// ---------------------------------------------------------------------------------------
+
+function publicDoc(ownerId: string, status: string, visibility = "public") {
+  return {
+    ownerId,
+    handle: ownerId,
+    visibility,
+    status,
+    recipe: recipe("Public noodles"),
+    sourceVersion: 1,
+    source: {
+      kind: "video",
+      platform: "youtube",
+      videoId: "abc123",
+      url: "https://www.youtube.com/watch?v=abc123",
+      title: "Noodles",
+      channelName: "Chef",
+      channelUrl: null,
+      thumbnailUrl: null,
+      startOffsetSeconds: 0,
+    },
+    tags: ["chinese"],
+    terms: ["noodles", "garlic", "chinese"],
+    stats: { saves: 0, likes: 0, score: 0 },
+    publishedAt: NOW,
+    updatedAt: NOW,
+  };
+}
+
+/** p1 = alice's live public recipe (her r1); p2 = bob's, flagged for review; p3 unlisted. */
+async function seedPublic() {
+  await env.withSecurityRulesDisabled(async (ctx) => {
+    const db = ctx.firestore();
+    await setDoc(doc(db, "publicRecipes/r1"), publicDoc("alice", "live"));
+    await setDoc(doc(db, "publicRecipes/r2"), publicDoc("bob", "review"));
+    await setDoc(doc(db, "publicRecipes/p3"), publicDoc("bob", "live", "unlisted"));
+    await setDoc(doc(db, "handles/alice"), { uid: "alice" });
+    await setDoc(doc(db, "sources/youtube:abc123"), { publicRecipeId: "r1" });
+    await setDoc(doc(db, "users/alice/saves/p3"), { savedAt: NOW });
+    await setDoc(doc(db, "users/alice/likes/p3"), { likedAt: NOW });
+    await setDoc(doc(db, "reports/x1"), { publicRecipeId: "r2", kind: "screening" });
+  });
+}
+
+const admin = (): Firestore => env.authenticatedContext("root", { admin: true }).firestore();
+const explore = (db: Firestore) =>
+  query(
+    collection(db, "publicRecipes"),
+    where("status", "==", "live"),
+    where("visibility", "==", "public"),
+    orderBy("publishedAt", "desc"),
+  );
+
+describe("public recipes: reading", () => {
+  beforeEach(seedPublic);
+
+  it("anyone, signed out too, reads a live recipe by id — public or unlisted", async () => {
+    await assertSucceeds(getDoc(doc(anon(), "publicRecipes/r1")));
+    await assertSucceeds(getDoc(doc(anon(), "publicRecipes/p3")));
+    await assertSucceeds(getDoc(doc(as("carol"), "publicRecipes/r1")));
+  });
+
+  it("Explore lists live public recipes with the required filters, signed out too", async () => {
+    await assertSucceeds(getDocs(explore(anon())));
+    await assertSucceeds(
+      getDocs(query(explore(anon()), where("terms", "array-contains", "garlic"))),
+    );
+  });
+
+  it("an unfiltered list, or one that could include unlisted/review, is denied", async () => {
+    await assertFails(getDocs(collection(anon(), "publicRecipes")));
+    await assertFails(getDocs(query(collection(anon(), "publicRecipes"), where("status", "==", "live"))));
+  });
+
+  it("recipes in review are visible only to the owner and admins", async () => {
+    await assertFails(getDoc(doc(anon(), "publicRecipes/r2")));
+    await assertFails(getDoc(doc(as("alice"), "publicRecipes/r2")));
+    await assertSucceeds(getDoc(doc(as("bob"), "publicRecipes/r2")));
+    await assertSucceeds(getDoc(doc(admin(), "publicRecipes/r2")));
+  });
+
+  it("owners list their own published recipes, any status", async () => {
+    await assertSucceeds(getDocs(query(collection(as("bob"), "publicRecipes"), where("ownerId", "==", "bob"))));
+    await assertFails(getDocs(query(collection(as("alice"), "publicRecipes"), where("ownerId", "==", "bob"))));
+  });
+
+  it("handles and video sources are readable by anyone", async () => {
+    await assertSucceeds(getDoc(doc(anon(), "handles/alice")));
+    await assertSucceeds(getDoc(doc(anon(), "sources/youtube:abc123")));
+  });
+
+  it("users read only their own likes and saves", async () => {
+    await assertSucceeds(getDocs(collection(as("alice"), "users/alice/saves")));
+    await assertSucceeds(getDoc(doc(as("alice"), "users/alice/likes/p3")));
+    await assertFails(getDocs(collection(as("bob"), "users/alice/saves")));
+    await assertFails(getDoc(doc(anon(), "users/alice/likes/p3")));
+  });
+
+  it("nobody reads reports from the browser, not even admins", async () => {
+    await assertFails(getDoc(doc(as("bob"), "reports/x1")));
+    await assertFails(getDoc(doc(admin(), "reports/x1")));
+  });
+});
+
+describe("public recipes: only the API writes", () => {
+  beforeEach(seedPublic);
+
+  it("owners can't publish, change status, or inflate stats themselves", async () => {
+    const db = as("alice");
+    await assertFails(setDoc(doc(db, "publicRecipes/new1"), publicDoc("alice", "live")));
+    await assertFails(updateDoc(doc(db, "publicRecipes/r1"), { "stats.likes": 999 }));
+    await assertFails(updateDoc(doc(as("bob"), "publicRecipes/r2"), { status: "live" }));
+    await assertFails(deleteDoc(doc(db, "publicRecipes/r1")));
+  });
+
+  it("nobody claims handles, sources, likes, saves, or files reports directly", async () => {
+    await assertFails(setDoc(doc(as("carol"), "handles/carol"), { uid: "carol" }));
+    await assertFails(setDoc(doc(as("carol"), "sources/youtube:zzz"), { publicRecipeId: "x" }));
+    await assertFails(setDoc(doc(as("alice"), "users/alice/likes/r1"), { likedAt: NOW }));
+    await assertFails(setDoc(doc(as("alice"), "users/alice/saves/r1"), { savedAt: NOW }));
+    await assertFails(setDoc(doc(anon(), "reports/new"), { publicRecipeId: "r1" }));
+  });
+
+  it("admins can't bypass the API either", async () => {
+    await assertFails(updateDoc(doc(admin(), "publicRecipes/r2"), { status: "live" }));
+  });
+
+  it("a published private recipe can't be deleted until it's unpublished", async () => {
+    const db = as("alice");
+    const deleteAll = () => {
+      const batch = writeBatch(db);
+      batch.delete(doc(db, "recipes/r1/versions/1"));
+      batch.delete(doc(db, "recipes/r1/private/transcript"));
+      batch.delete(doc(db, "recipes/r1"));
+      return batch.commit();
+    };
+    await assertFails(deleteAll());
+
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await deleteDoc(doc(ctx.firestore(), "publicRecipes/r1"));
+    });
+    await assertSucceeds(deleteAll());
+  });
+});

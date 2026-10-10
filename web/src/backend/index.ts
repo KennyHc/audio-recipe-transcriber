@@ -1,6 +1,7 @@
 import type { Backend } from "./types";
 import { createServerBackend } from "./server";
 import type { Account } from "./account";
+import type { PublicBank } from "./publicBank";
 
 // The build-time mode switch. Vite inlines `import.meta.env.VITE_BACKEND` as a string
 // literal at build time, so `npm run build` (VITE_BACKEND unset → "server" branch) never
@@ -13,7 +14,7 @@ import type { Account } from "./account";
 // The cost is that module evaluation — and therefore first paint — waits for the dynamic
 // import to resolve in browser mode; that's a one-time, same-tick cost since the import
 // itself is local code (no network round trip beyond the browser backend's own chunk).
-async function resolveRuntime(): Promise<{ backend: Backend; account: Account | null }> {
+async function resolveRuntime(): Promise<{ backend: Backend; account: Account | null; publicBank: PublicBank | null }> {
   // "cloud" (signed-in SaaS) — Firebase is only ever reachable through this branch, so the
   // other builds don't contain it (same dead-code elimination as below).
   if (import.meta.env.VITE_BACKEND === "cloud") {
@@ -24,9 +25,9 @@ async function resolveRuntime(): Promise<{ backend: Backend; account: Account | 
   // Whisper pipeline) — only its Claude calls differ, swapped inside browser/claudeProvider.ts.
   if (import.meta.env.VITE_BACKEND === "browser" || import.meta.env.VITE_BACKEND === "hosted") {
     const { createBrowserBackend } = await import("./browser");
-    return { backend: createBrowserBackend(), account: null };
+    return { backend: createBrowserBackend(), account: null, publicBank: null };
   }
-  return { backend: createServerBackend(), account: null };
+  return { backend: createServerBackend(), account: null, publicBank: null };
 }
 
 const runtime = await resolveRuntime();
@@ -34,6 +35,9 @@ const runtime = await resolveRuntime();
 export const backend: Backend = runtime.backend;
 /** The signed-in account in cloud mode; null in every other mode (no accounts there). */
 export const account: Account | null = runtime.account;
+/** The public recipe bank in cloud mode (works signed out); null in every other mode. */
+export const publicBank: PublicBank | null = runtime.publicBank;
 
 export * from "./types";
 export type { Account, AccountUser } from "./account";
+export type { PublicBank, ExplorePage, SavedEntry } from "./publicBank";

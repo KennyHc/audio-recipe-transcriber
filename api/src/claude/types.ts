@@ -1,4 +1,4 @@
-import type { ExtractedRecipe, RecipeWarning, Transcript } from "@recipe/shared";
+import type { ExtractedRecipe, RecipeWarning, ScreeningOutput, Transcript } from "@recipe/shared";
 import type { ClaudeUsage } from "../cost";
 import { AppError } from "../errors";
 
@@ -8,7 +8,7 @@ export interface ClaudeResult<T> {
 }
 
 /**
- * The two Claude calls the API makes. Implementations return the model's RAW output; the
+ * The Claude calls the API makes. Implementations return the model's RAW output; the
  * deterministic post-processing (normalizeExtractedRecipe, finalizeWarnings) happens in
  * pipeline.ts so it runs — and is tested — no matter which implementation is plugged in.
  * Tests pass a fake; src/claude/anthropic.ts is the real one.
@@ -16,11 +16,15 @@ export interface ClaudeResult<T> {
 export interface ClaudeService {
   extract(transcript: Transcript): Promise<ClaudeResult<ExtractedRecipe>>;
   verify(transcript: Transcript, recipe: ExtractedRecipe): Promise<ClaudeResult<RecipeWarning[]>>;
+  /** Publish screening (Phase 2). `userMessage` is formatScreeningInput(...) — untrusted text. */
+  screen(userMessage: string): Promise<ClaudeResult<ScreeningOutput>>;
 }
 
 /** max_tokens for each call; also the worst-case output used to reserve budget. */
 export const EXTRACT_MAX_TOKENS = 8000;
 export const VERIFY_MAX_TOKENS = 8000;
+/** The screening answer is one enum + one sentence. */
+export const SCREEN_MAX_TOKENS = 300;
 
 /**
  * A response came back but was unusable (refusal, truncated, unparseable). Unlike a network

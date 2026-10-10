@@ -3,24 +3,44 @@
  * it against the Firebase emulators with a fake Claude and a controllable clock; main.ts
  * wires the real dependencies.
  */
-import { APP_CHECK_HEADER, CreateRecipeRequest, ImportRequest } from "@recipe/shared";
+import {
+  AdminActionRequest,
+  APP_CHECK_HEADER,
+  CreateRecipeRequest,
+  ImportRequest,
+  PublishRequest,
+  ReportRequest,
+} from "@recipe/shared";
 import type { Firestore } from "firebase-admin/firestore";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { deleteAccount, getMe } from "./account";
-import { type AppCheckVerifier, type AuthAdmin, type AuthVariables, requireAppCheck, requireUser } from "./auth";
+import {
+  type AppCheckVerifier,
+  type AuthAdmin,
+  type AuthVariables,
+  optionalUser,
+  requireAdmin,
+  requireAppCheck,
+  requireUser,
+} from "./auth";
 import type { ClaudeService } from "./claude/types";
 import { assertValidConfig, type Config } from "./config";
 import { AppError, appError, sanitizedErrorLog, toErrorResponseParts } from "./errors";
+import { copyPublicRecipe, type EngagementKind, setEngagement } from "./engagement";
 import { importJobs } from "./importer";
 import { jsonLogger, type Logger } from "./log";
 import type { PipelineDeps } from "./pipeline";
+import { adminAction, adminQueue, clientIp, createReport, isAdminToken } from "./moderation";
+import { publishRecipe, type PublicDeps, unpublishRecipe } from "./publish";
 import { createRecipe, reextractRecipe } from "./recipes";
+import { type FetchLike, MAX_SOURCE_URL_CHARS, previewSource } from "./sources";
 import {
   DEFAULT_BODY_LIMIT_BYTES,
   IMPORT_BODY_LIMIT_BYTES,
   parseBodyOrThrow,
+  PUBLIC_BODY_LIMIT_BYTES,
   readJsonBody,
 } from "./validation";
 
@@ -32,6 +52,8 @@ export interface AppDeps {
   config: Config;
   now?: () => Date;
   logger?: Logger;
+  /** Outgoing fetch for oEmbed/TikTok short links only (tests inject a fake). */
+  fetch?: FetchLike;
 }
 
 /** Account deletion needs a sign-in this recent (seconds). */
@@ -45,6 +67,7 @@ export function createApp(deps: AppDeps): Hono<{ Variables: AuthVariables }> {
   const now = deps.now ?? (() => new Date());
   const logger = deps.logger ?? jsonLogger;
   const pipeline: PipelineDeps = { db, claude: deps.claude, config, now, logger };
+  const publicDeps: PublicDeps = { ...pipeline, fetch: deps.fetch ?? ((input, init) => fetch(input, init)) };
 
   const app = new Hono<{ Variables: AuthVariables }>();
 
@@ -102,7 +125,63 @@ export function createApp(deps: AppDeps): Hono<{ Variables: AuthVariables }> {
   });
 
   app.delete("/me", appCheck, recentUser, async (c) => {
-    await deleteAccount(db, auth, c.get("user").uid);
+    await deleteAccount(db, auth, c.get("user").uid, logger);
+    return c.body(null, 204);
+  });
+
+  // ---- Phase 2: publishing + the public recipe bank (shared/public.ts) ----
+
+  app.get("/sources/preview", appCheck, user, async (c) => {
+    const url = c.req.query("url");
+    if (!url || url.length > MAX_SOURCE_URL_CHARS) throw appError("bad_request");
+    return c.json(await previewSource(db, publicDeps.fetch, url), 200);
+  });
+
+  app.post("/recipes/:id/publish", appCheck, user, async (c) => {
+    const body = parseBodyOrThrow(PublishRequest, await readJsonBody(c.req.raw, PUBLIC_BODY_LIMIT_BYTES));
+    return c.json(await publishRecipe(publicDeps, c.get("user"), c.req.param("id"), body), 200);
+  });
+
+  app.delete("/recipes/:id/publish", appCheck, user, async (c) => {
+    const decoded = c.get("user");
+    await unpublishRecipe(db, decoded, c.req.param("id"), isAdminToken(decoded));
+    return c.body(null, 204);
+  });
+
+  for (const kind of ["like", "save"] as const satisfies readonly EngagementKind[]) {
+    app.post(`/public/:id/${kind}`, appCheck, user, async (c) => {
+      return c.json(await setEngagement(db, c.get("user"), c.req.param("id"), kind, true, now()), 200);
+    });
+    app.delete(`/public/:id/${kind}`, appCheck, user, async (c) => {
+      return c.json(await setEngagement(db, c.get("user"), c.req.param("id"), kind, false, now()), 200);
+    });
+  }
+
+  app.post("/public/:id/copy", appCheck, user, async (c) => {
+    return c.json(await copyPublicRecipe(db, c.get("user"), c.req.param("id"), now()), 201);
+  });
+
+  // Works signed out: App Check required, ID token optional.
+  app.post("/public/:id/report", appCheck, optionalUser(auth), async (c) => {
+    const body = parseBodyOrThrow(ReportRequest, await readJsonBody(c.req.raw, PUBLIC_BODY_LIMIT_BYTES));
+    const ip = clientIp(c.req.header("X-Forwarded-For"));
+    await createReport(
+      { db, logger, now: now(), reportSalt: config.reportSalt },
+      c.get("optionalUser"),
+      ip,
+      c.req.param("id"),
+      body,
+    );
+    return c.body(null, 202);
+  });
+
+  app.get("/admin/queue", appCheck, user, requireAdmin, async (c) => {
+    return c.json(await adminQueue(db), 200);
+  });
+
+  app.post("/admin/public/:id", appCheck, user, requireAdmin, async (c) => {
+    const body = parseBodyOrThrow(AdminActionRequest, await readJsonBody(c.req.raw, PUBLIC_BODY_LIMIT_BYTES));
+    await adminAction(db, logger, c.req.param("id"), body, now());
     return c.body(null, 204);
   });
 
@@ -116,7 +195,7 @@ export function createApp(deps: AppDeps): Hono<{ Variables: AuthVariables }> {
       logger.log("ERROR", "unhandled error", {
         method: c.req.method,
         path: c.req.path,
-        error: sanitizedErrorLog(err, [config.anthropicApiKey]),
+        error: sanitizedErrorLog(err, [config.anthropicApiKey, config.reportSalt]),
       });
     }
     const { status, body } = toErrorResponseParts(err);
