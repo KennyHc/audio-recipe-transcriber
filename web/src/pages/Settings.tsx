@@ -4,10 +4,11 @@ import { consumeSetupMessage } from "@/lib/needsSetup";
 import { getBrowserSettings, saveBrowserSettings, maskApiKey } from "@/backend/settings";
 import { BROWSER_DB_NAME } from "@/backend/constants";
 import { deleteAllModelChunks } from "@/backend/browser/modelDownloader";
+import { clearAll } from "@/lib/shopping";
 import { closeDbConnection } from "@/backend/browser/db";
 import { SPEECH_MODEL_CATALOG, speechModelKey } from "@/backend/browser/modelCatalog";
 import { DEFAULT_BROWSER_SETTINGS } from "@/backend/types";
-import { backend } from "@/backend";
+import { backend, shoppingList } from "@/backend";
 import { IS_CLOUD, IS_HOSTED } from "@/lib/mode";
 import { useAccountUser } from "@/lib/useAccount";
 import { AccountSection } from "@/components/account/AccountSection";
@@ -158,6 +159,8 @@ export function Settings() {
         );
       }
       await deleteAllModelChunks().catch(() => undefined);
+      // The shopping list lives in this browser too (cloud mode keeps it in the account instead).
+      if (!IS_CLOUD) await shoppingList.update(() => clearAll()).catch(() => undefined);
       persist(DEFAULT_BROWSER_SETTINGS);
       setDeleteOpen(false);
     } catch {

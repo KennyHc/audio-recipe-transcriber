@@ -17,6 +17,7 @@ import {
   setFinishStep,
   startPipeline,
 } from "./runner";
+import { errorReporter } from "@/lib/errorReporting";
 
 // Only the expensive leaves are mocked (Whisper worker, Claude, the Cache Storage check, and
 // the chunked model downloader — which has its own dedicated test file, modelDownloader.test.ts).
@@ -29,7 +30,7 @@ vi.mock("./claude", () => ({
   VerificationError: class extends Error {},
 }));
 vi.mock("./modelCatalog", () => ({ isModelCached: vi.fn() }));
-vi.mock("./modelDownloader", () => ({ ensureModelDownloaded: vi.fn() }));
+vi.mock("./modelDownloader", () => ({ ensureModelDownloaded: vi.fn(), InsufficientStorageError: class extends Error {} }));
 
 const transcript: Transcript = {
   language: "en",
@@ -320,5 +321,56 @@ describe("finish step seam (cloud mode)", () => {
     await runPipeline(jobId);
     await waitForStatus("done");
     expect(extractRecipe).toHaveBeenCalled();
+  });
+});
+
+describe("error reports", () => {
+  afterEach(() => setFinishStep(null));
+
+  it("reports a pipeline failure with the stage it failed in", async () => {
+    const report = vi.spyOn(errorReporter, "report");
+    vi.mocked(extractRecipe).mockRejectedValue(Object.assign(new Error("extractor refused"), { name: "ExtractionError" }));
+    await seedJob();
+    await db.saveAudio(jobId, "clip.mp3", new Blob(["audio"]));
+    await runPipeline(jobId);
+    await waitForStatus("error");
+    expect(report).toHaveBeenCalledWith(expect.objectContaining({ kind: "pipeline", stage: "extracting", code: "ExtractionError" }));
+    report.mockRestore();
+  });
+
+  it("reports a model download failure once, as model_download (not again as pipeline)", async () => {
+    const report = vi.spyOn(errorReporter, "report");
+    vi.mocked(ensureModelDownloaded).mockRejectedValue(new TypeError("Failed to fetch"));
+    await seedJob();
+    await db.saveAudio(jobId, "clip.mp3", new Blob(["audio"]));
+    await runPipeline(jobId);
+    await waitForStatus("error");
+    expect(report.mock.calls.map(([r]) => [r.kind, r.stage, r.code])).toEqual([["model_download", "download", "network"]]);
+    report.mockRestore();
+  });
+
+  it("doesn't report user-facing API answers (4xx, e.g. the monthly limit)", async () => {
+    const report = vi.spyOn(errorReporter, "report");
+    setFinishStep(async () => {
+      throw Object.assign(new Error("You've used your 30 free recipes this month."), { status: 429, code: "quota_exceeded" });
+    });
+    await seedJob({ status: "error", error: "old" });
+    await db.saveTranscript(jobId, transcript);
+    await runReextract(jobId);
+    await waitForStatus("error");
+    expect(report).not.toHaveBeenCalled();
+    report.mockRestore();
+  });
+
+  it("reports jobs interrupted mid-stage, but not ones paused at queued", async () => {
+    const report = vi.spyOn(errorReporter, "report");
+    await seedJob({ status: "transcribing" });
+    await recoverInterruptedJobs();
+    expect(report).toHaveBeenCalledWith(expect.objectContaining({ kind: "pipeline", stage: "transcribing", code: "interrupted" }));
+    report.mockClear();
+    await db.updateJob(jobId, { status: "queued" });
+    await recoverInterruptedJobs();
+    expect(report).not.toHaveBeenCalled();
+    report.mockRestore();
   });
 });

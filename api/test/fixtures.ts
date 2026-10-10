@@ -87,6 +87,9 @@ export const SCREEN_USAGE: ClaudeUsage = { inputTokens: 600, outputTokens: 20, c
  * redirects from in-memory tables, and records every URL. Anything else → throws, so a test
  * that would hit some other host fails loudly.
  */
+export const SITE_INDEX_HTML =
+  '<!doctype html><html><head><meta charset="UTF-8" /><title>Recipe Transcriber</title></head><body><div id="root"></div></body></html>';
+
 export class FakeFetch {
   calls: string[] = [];
   /** Video ids whose oEmbed lookup returns this status (default: 200 with generated credit). */
@@ -119,6 +122,10 @@ export class FakeFetch {
         thumbnail_url: `https://p16.tiktokcdn.com/${id}.jpeg`,
       });
     }
+    // The Hosting site's index.html (GET /r/:id link previews; testConfig's publicSiteOrigin).
+    if (url.origin === "https://site.example" && url.pathname === "/index.html") {
+      return new Response(SITE_INDEX_HTML, { status: 200, headers: { "Content-Type": "text/html" } });
+    }
     const location = this.redirects.get(input);
     if (location) return new Response(null, { status: 301, headers: { Location: location } });
     throw new Error(`FakeFetch: unexpected request to ${url.host}`);
@@ -142,6 +149,7 @@ export function testConfig(overrides: Partial<Config> = {}): Config {
     allowedOrigins: ["https://recipe-transcriber.pages.dev"],
     requireAppCheck: false,
     reportSalt: "test-salt-not-real",
+    publicSiteOrigin: "https://site.example",
     ...overrides,
   };
 }

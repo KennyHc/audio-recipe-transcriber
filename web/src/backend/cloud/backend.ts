@@ -29,7 +29,7 @@ import type { ApiClient } from "./api";
 import type { RecipeStore } from "./store";
 import { buildImportRequests, mergeJobs, recipeToJob, usageToQuota } from "./mapping";
 import { createCloudFinish } from "./finish";
-import { forgetLocalJob, localJobOwner, markLocalJob } from "./localJobs";
+import { forgetLocalJob, localJobOwner, markLocalJob, setLocalJobSourceUrl } from "./localJobs";
 
 export interface CloudSession {
   /** The signed-in uid; throws "Sign in to continue." when signed out (waits for session restore). */
@@ -210,7 +210,7 @@ export function createCloudBackend(deps: CloudBackendDeps): Backend {
       return url;
     },
 
-    uploadAudio(file: File, onProgress: (fraction: number) => void) {
+    uploadAudio(file, onProgress, options) {
       const uid = session.currentUid();
       if (!uid) {
         return { promise: Promise.reject(new Error("Sign in to add a recipe.")), cancel: () => undefined };
@@ -219,6 +219,7 @@ export function createCloudBackend(deps: CloudBackendDeps): Backend {
       return {
         promise: upload.promise.then((job) => {
           markLocalJob(job.id, uid);
+          if (options?.sourceUrl) setLocalJobSourceUrl(job.id, options.sourceUrl);
           return job;
         }),
         cancel: upload.cancel,

@@ -18,7 +18,7 @@ import {
 import type { PublicRecipe, PublicStats } from "@recipe/shared";
 import { publicBank } from "@/backend";
 import { useAccountUser } from "@/lib/useAccount";
-import { exploreHref, jobHref, navigate, publicUrl } from "@/lib/router";
+import { creatorHref, exploreHref, jobHref, navigate, publicUrl } from "@/lib/router";
 import { isYouTube, timestampAction, timestampsUseful } from "@/lib/videoSeek";
 import { reviewNotice, tagLabel } from "@/lib/publish";
 import { formatDuration } from "@/lib/format";
@@ -41,6 +41,7 @@ import { YouTubePlayer, type YouTubePlayerHandle } from "@/components/public/You
 import { RecipeThumbnail } from "@/components/public/PublicRecipeCard";
 import { ReportDialog, type ReportKind } from "@/components/public/ReportDialog";
 import { SignInPromptDialog } from "@/components/public/SignInPromptDialog";
+import { AddToShoppingListButton } from "@/components/shopping/AddToShoppingListButton";
 import { PublicStatusPill } from "@/components/publish/PublicStatusPill";
 import { NoodlesLogo } from "@/components/NoodlesLogo";
 
@@ -78,7 +79,10 @@ function Credit({ pub }: { pub: PublicRecipe }) {
   if (s.kind === "own") {
     return (
       <p className="text-[hsl(var(--ink-muted))]">
-        Original recipe by <strong className="font-semibold text-[hsl(var(--ink))]">@{pub.handle}</strong>
+        Original recipe by{" "}
+        <a href={creatorHref(pub.handle)} className="font-semibold text-[hsl(var(--ink))] underline-offset-4 hover:underline">
+          @{pub.handle}
+        </a>
       </p>
     );
   }
@@ -96,7 +100,15 @@ function Credit({ pub }: { pub: PublicRecipe }) {
           </>
         )}
       </p>
-      <p className="text-sm text-[hsl(var(--ink-faint))]">Transcribed by @{pub.handle}</p>
+      <p className="text-sm text-[hsl(var(--ink-faint))]">
+        Transcribed by{" "}
+        <a
+          href={creatorHref(pub.handle)}
+          className="text-[hsl(var(--ink-muted))] underline-offset-4 hover:text-[hsl(var(--accent-text))] hover:underline"
+        >
+          @{pub.handle}
+        </a>
+      </p>
     </div>
   );
 }
@@ -443,6 +455,16 @@ export function PublicRecipePage({ id }: { id: string }) {
           checkedIngredients={checked}
           onToggleIngredient={toggleIngredient}
           audience="public"
+          ingredientsAction={
+            <AddToShoppingListButton
+              recipeId={pub.id}
+              title={recipe.title}
+              isPublic
+              ingredients={recipe.ingredients}
+              scaleFactor={scaleFactor}
+              onNeedSignIn={() => setSignInFor("add to your shopping list")}
+            />
+          }
         />
       </AudioAvailableContext.Provider>
 

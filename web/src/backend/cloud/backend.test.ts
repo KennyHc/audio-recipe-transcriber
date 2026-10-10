@@ -11,7 +11,7 @@ import { createCloudBackend, type UsageCache } from "./backend";
 import type { ApiClient } from "./api";
 import type { RecipeStore } from "./store";
 import { CloudApiError } from "./errors";
-import { clearLocalJobOwners, localJobOwner, markLocalJob } from "./localJobs";
+import { clearLocalJobOwners, localJobOwner, localJobSourceUrl, markLocalJob } from "./localJobs";
 import { moveLegacyJobs, listLegacyJobs } from "./legacy";
 import { cloudRecipe, transcript, usage, versioned } from "./testFixtures";
 
@@ -203,6 +203,32 @@ describe("upload → transcribe → POST /recipes", () => {
     await waitFor(async () => (await backend.getJob(job.id)).status === "done");
     expect(transcribeAudio).not.toHaveBeenCalled();
     expect(api.createRecipe).toHaveBeenCalledTimes(2);
+  });
+
+  it("carries the video link entered at upload into POST /recipes (sourceUrl), then forgets it", async () => {
+    const url = "https://www.youtube.com/watch?v=qH__o17xHls";
+    const job = await backend.uploadAudio(new File(["x"], "pasta.mp3"), () => undefined, { sourceUrl: url }).promise;
+    expect(localJobSourceUrl(job.id)).toBe(url);
+    await waitFor(async () => (await backend.getJob(job.id)).status === "done");
+    expect(api.createRecipe).toHaveBeenCalledWith({ id: job.id, fileName: "pasta.mp3", transcript, sourceUrl: url });
+    expect(localJobSourceUrl(job.id)).toBeNull();
+  });
+
+  it("keeps the video link across a failed POST, so Retry still sends it", async () => {
+    const url = "https://www.tiktok.com/@cook/video/7234567890123456789";
+    api.createRecipe.mockRejectedValueOnce(new CloudApiError("budget_exhausted", "Try again tomorrow.", 503));
+    const job = await backend.uploadAudio(new File(["x"], "pasta.mp3"), () => undefined, { sourceUrl: url }).promise;
+    await waitFor(async () => (await backend.getJob(job.id)).status === "error");
+    expect(localJobSourceUrl(job.id)).toBe(url);
+    await backend.retry(job.id);
+    await waitFor(async () => (await backend.getJob(job.id)).status === "done");
+    expect(api.createRecipe).toHaveBeenLastCalledWith({ id: job.id, fileName: "pasta.mp3", transcript, sourceUrl: url });
+  });
+
+  it("sends no sourceUrl when the link was left empty", async () => {
+    const job = await backend.uploadAudio(new File(["x"], "pasta.mp3"), () => undefined, { sourceUrl: null }).promise;
+    await waitFor(async () => (await backend.getJob(job.id)).status === "done");
+    expect(api.createRecipe.mock.calls[0][0]).not.toHaveProperty("sourceUrl");
   });
 
   it("refuses to upload while signed out", async () => {

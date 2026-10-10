@@ -151,6 +151,17 @@ export function formFromSnapshot(pub: PublicRecipe, needsHandle = false): Publis
   };
 }
 
+/**
+ * The form for a first publish: the recipe's saved video/page link (recipes/{id}.sourceUrl,
+ * entered at upload) prefills the video link — still editable. Without one, the empty form.
+ */
+export function formFromSourceUrl(sourceUrl: string | null | undefined, needsHandle = false): PublishForm {
+  const base = { ...EMPTY_FORM, needsHandle };
+  const url = sourceUrl ? normalizeUrl(sourceUrl) : null;
+  if (!url) return base;
+  return { ...base, sourceKind: "video", videoUrl: url };
+}
+
 export function toggleTag(tags: readonly string[], tag: string): string[] {
   if (tags.includes(tag)) return tags.filter((t) => t !== tag);
   if (tags.length >= MAX_TAGS) return [...tags];

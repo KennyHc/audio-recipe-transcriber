@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
 
-// Routes are hash routes (#/jobs/:id, #/settings, …) — except one PATH route: the public recipe
-// page /r/{id}. Link-preview crawlers ignore everything after "#", so shared links must be real
+// Routes are hash routes (#/jobs/:id, #/settings, …) — except two PATH routes: the public recipe
+// page /r/{id} and the creator page /@handle. Link-preview crawlers ignore everything after "#", so shared links must be real
 // paths (Cloudflare Pages serves index.html for them; web/functions/r/[id].ts adds the meta tags).
 //
 // Moving between the two kinds of URL stays inside the app: navigate() and a document-level
-// click handler use history.pushState for "/r/…" links, and for "#/…" links while the page is on
+// click handler use history.pushState for "/r/…" and "/@…" links, and for "#/…" links while the page is on
 // a path route (otherwise the browser would append the hash to /r/{id}), then announce the change
 // with ROUTE_CHANGE_EVENT. Back/forward fire popstate (path changes) or hashchange (hash changes).
 
@@ -17,11 +17,23 @@ export type Route =
   | { name: "terms" }
   | { name: "explore" }
   | { name: "admin" }
-  | { name: "public"; id: string };
+  | { name: "list" }
+  | { name: "public"; id: string }
+  | { name: "creator"; handle: string };
 
 export const ROUTE_CHANGE_EVENT = "rt:routechange";
 
 const PUBLIC_PATH = /^\/r\/([^/]+)\/?$/;
+/** Creator pages: /@handle (also /%40handle, as some apps encode the "@"). */
+const CREATOR_PATH = /^\/(?:@|%40)([^/]+)\/?$/i;
+
+function safeDecode(s: string): string {
+  try {
+    return decodeURIComponent(s);
+  } catch {
+    return s;
+  }
+}
 
 export function parseHash(hash: string): Route {
   const clean = hash.replace(/^#\/?/, "");
@@ -40,28 +52,24 @@ export function parseHash(hash: string): Route {
       return { name: "explore" };
     case "admin":
       return { name: "admin" };
+    case "list":
+      return { name: "list" };
     default:
       return { name: "library" };
   }
 }
 
-/** The path route wins: /r/{id} is the public page whatever the hash says. */
+/** The path routes win: /r/{id} and /@handle are what they say whatever the hash says. */
 export function parseLocation(pathname: string, hash: string): Route {
   const m = PUBLIC_PATH.exec(pathname);
-  if (m) {
-    let id: string;
-    try {
-      id = decodeURIComponent(m[1]);
-    } catch {
-      id = m[1];
-    }
-    return { name: "public", id };
-  }
+  if (m) return { name: "public", id: safeDecode(m[1]) };
+  const c = CREATOR_PATH.exec(pathname);
+  if (c) return { name: "creator", handle: safeDecode(c[1]) };
   return parseHash(hash);
 }
 
 export function isPathRoute(pathname: string): boolean {
-  return PUBLIC_PATH.test(pathname);
+  return PUBLIC_PATH.test(pathname) || CREATOR_PATH.test(pathname);
 }
 
 function currentRoute(): Route {
@@ -73,7 +81,7 @@ function currentRoute(): Route {
  * "default" = let the browser handle it (a plain hash change on "/", or a foreign link).
  */
 export function linkNavigation(href: string, pathname: string): { kind: "push"; url: string } | { kind: "default" } {
-  if (href.startsWith("/r/")) return { kind: "push", url: href };
+  if (href.startsWith("/r/") || href.startsWith("/@")) return { kind: "push", url: href };
   if (href.startsWith("#") && isPathRoute(pathname)) return { kind: "push", url: `/${href === "#" ? "#/" : href}` };
   return { kind: "default" };
 }
@@ -159,6 +167,10 @@ export function exploreHref() {
   return "#/explore";
 }
 
+export function shoppingListHref() {
+  return "#/list";
+}
+
 export function adminHref() {
   return "#/admin";
 }
@@ -166,6 +178,11 @@ export function adminHref() {
 /** The shareable public page — a real path (see the top of this file). */
 export function publicHref(id: string) {
   return `/r/${encodeURIComponent(id)}`;
+}
+
+/** A creator's page — a real path like /r/{id}. */
+export function creatorHref(handle: string) {
+  return `/@${encodeURIComponent(handle)}`;
 }
 
 export function publicUrl(id: string, origin: string = window.location.origin) {

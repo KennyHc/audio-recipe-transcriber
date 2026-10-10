@@ -1,5 +1,8 @@
-import { useState } from "react";
-import { UploadCloud, Laptop, ListChecks, ShieldCheck, Cloud, History, Compass } from "lucide-react";
+import { useEffect, useState } from "react";
+import type { PublicRecipe } from "@recipe/shared";
+import { publicBank } from "@/backend";
+import { PublicRecipeCard } from "@/components/public/PublicRecipeCard";
+import { UploadCloud, Laptop, ListChecks, ShieldCheck, Cloud, History, Compass, ArrowRight } from "lucide-react";
 import { SignInPanel } from "@/components/account/SignInPanel";
 import { exploreHref, privacyHref } from "@/lib/router";
 import { Button } from "@/components/ui/button";
@@ -32,6 +35,20 @@ const FEATURES = [
 /** The library route while signed out (cloud mode): what the app does, and how to sign in. */
 export function SignedOutLanding() {
   const [deleted] = useState(() => consumeAccountDeleted());
+  const [recent, setRecent] = useState<PublicRecipe[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    publicBank
+      ?.recentPublic(4)
+      .then((items) => {
+        if (!cancelled) setRecent(items);
+      })
+      .catch(() => undefined); // the strip is a nice-to-have; the landing works without it
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   return (
     <div className="mx-auto max-w-[1120px] px-4 py-6 sm:py-14 space-y-6 sm:space-y-10">
@@ -96,6 +113,32 @@ export function SignedOutLanding() {
           ))}
         </div>
       </div>
+
+      {recent.length > 0 && (
+        <section aria-labelledby="recently-shared" className="space-y-3">
+          <div className="flex items-baseline justify-between gap-2">
+            <h2
+              id="recently-shared"
+              className="text-[12px] font-medium uppercase tracking-[0.08em] text-[hsl(var(--ink-muted))]"
+            >
+              Recently shared
+            </h2>
+            <a
+              href={exploreHref()}
+              className="inline-flex items-center gap-1 text-sm text-[hsl(var(--accent-text))] underline-offset-4 hover:underline"
+            >
+              Explore all <ArrowRight className="h-3.5 w-3.5" />
+            </a>
+          </div>
+          <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {recent.map((pub) => (
+              <li key={pub.id}>
+                <PublicRecipeCard pub={pub} />
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       <ul className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {FEATURES.map(({ icon: Icon, title, text }) => (

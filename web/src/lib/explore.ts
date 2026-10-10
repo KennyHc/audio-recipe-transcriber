@@ -89,3 +89,22 @@ export function tagGroupOf(tag: string | null): TagGroup | null {
   if (!tag) return null;
   return TAG_GROUPS.find((g) => (TAGS[g] as readonly string[]).includes(tag)) ?? null;
 }
+
+/**
+ * What a filter dropdown's button says: the picked tag when it lives in this group ("Chinese"),
+ * otherwise the group's name ("Cuisine"). Labels are passed in so this stays free of UI copy.
+ */
+export function tagFilterButtonLabel(
+  group: TagGroup,
+  tag: string | null,
+  labels: { group: (g: TagGroup) => string; tag: (t: string) => string },
+): { text: string; active: boolean } {
+  return tagGroupOf(tag) === group && tag ? { text: labels.tag(tag), active: true } : { text: labels.group(group), active: false };
+}
+
+/** The empty-state copy for the current filters. */
+export function exploreEmptyMessage(params: ExploreParams): { title: string; hint: string } {
+  return isDefaultExplore(params)
+    ? { title: "No public recipes yet", hint: "Published recipes will show up here." }
+    : { title: "No recipes match", hint: "Try another word or filter." };
+}

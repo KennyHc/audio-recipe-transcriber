@@ -1,9 +1,10 @@
 import { useRef, useState } from "react";
-import { UploadCloud, Loader2 } from "lucide-react";
+import { UploadCloud, Loader2, Link2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { backend } from "@/backend";
 import { navigate, jobHref } from "@/lib/router";
 import { routeIfNeedsSetup } from "@/lib/needsSetup";
+import { parseSourceUrl } from "@/lib/sourceUrl";
 
 const ACCEPTED_EXTENSIONS = [".mp3", ".m4a", ".wav", ".webm", ".ogg", ".mp4", ".aac", ".flac"];
 
@@ -16,8 +17,11 @@ export function UploadZone({
   onUploaded,
   disabled = false,
   disabledMessage,
+  askSourceUrl = false,
 }: {
   onUploaded: () => void;
+  /** Cloud mode: an optional "Link to the video" field, sent with the recipe (prefills Publish). */
+  askSourceUrl?: boolean;
   /** When true, the dropzone no longer accepts files (e.g. today's free quota is used up). */
   disabled?: boolean;
   /** Shown in place of the normal headline/caption while `disabled` is true. */
@@ -27,9 +31,18 @@ export function UploadZone({
   const [dragging, setDragging] = useState(false);
   const [progress, setProgress] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [linkText, setLinkText] = useState("");
+  const [linkTouched, setLinkTouched] = useState(false);
+  const link = askSourceUrl ? parseSourceUrl(linkText) : ({ ok: true, url: null } as const);
+  const linkError = !link.ok && (linkTouched || linkText.length > 12) ? link.error : null;
 
   function startUpload(file: File) {
     if (disabled) return;
+    if (!link.ok) {
+      setLinkTouched(true);
+      setError("Fix the video link first — or clear it, it's optional.");
+      return;
+    }
     if (!hasAcceptedExtension(file.name)) {
       setError(
         `"${file.name}" doesn't look like a supported audio file. Try ${ACCEPTED_EXTENSIONS.join(", ")}.`,
@@ -38,10 +51,12 @@ export function UploadZone({
     }
     setError(null);
     setProgress(0);
-    const { promise } = backend.uploadAudio(file, (fraction) => setProgress(fraction));
+    const { promise } = backend.uploadAudio(file, (fraction) => setProgress(fraction), { sourceUrl: link.url });
     promise
       .then((job) => {
         setProgress(null);
+        setLinkText("");
+        setLinkTouched(false);
         onUploaded();
         navigate(jobHref(job.id));
       })
@@ -135,6 +150,46 @@ export function UploadZone({
           </div>
         )}
       </div>
+      {askSourceUrl && !disabled && (
+        <div className="space-y-1">
+          <label htmlFor="upload-source-url" className="text-xs font-medium text-[hsl(var(--ink-muted))]">
+            Link to the video <span className="font-normal text-[hsl(var(--ink-faint))]">(optional)</span>
+          </label>
+          <div className="relative">
+            <Link2 className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[hsl(var(--ink-faint))]" />
+            <input
+              id="upload-source-url"
+              type="url"
+              inputMode="url"
+              autoComplete="off"
+              spellCheck={false}
+              placeholder="YouTube, TikTok or any https:// link"
+              value={linkText}
+              disabled={progress !== null}
+              onChange={(e) => {
+                setLinkText(e.target.value);
+                if (error && parseSourceUrl(e.target.value).ok) setError(null);
+              }}
+              onBlur={() => setLinkTouched(true)}
+              aria-invalid={linkError ? true : undefined}
+              aria-describedby={linkError ? "upload-source-url-error" : "upload-source-url-hint"}
+              className={cn(
+                "h-9 w-full rounded-[var(--radius-control)] border bg-[hsl(var(--surface))] pl-8 pr-3 text-sm text-[hsl(var(--ink))] placeholder:text-[hsl(var(--ink-faint))] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--ring))]",
+                linkError ? "border-[hsl(var(--danger))]" : "border-[hsl(var(--border-strong))]",
+              )}
+            />
+          </div>
+          {linkError ? (
+            <p id="upload-source-url-error" className="text-xs text-[hsl(var(--danger))]">
+              {linkError}
+            </p>
+          ) : (
+            <p id="upload-source-url-hint" className="text-xs text-[hsl(var(--ink-faint))]">
+              Where the clip is from — makes publishing one click. Only you see it.
+            </p>
+          )}
+        </div>
+      )}
       {error && (
         <p role="alert" className="text-sm text-[hsl(var(--danger))]">
           {error}

@@ -3,10 +3,29 @@ import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { execSync } from "node:child_process";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
+// A short build id for error reports (lib/errorReporting.ts): the git short sha when this is a git
+// checkout, else the UTC build time ("b20261010-1432").
+function buildId(): string {
+  try {
+    const sha = execSync("git rev-parse --short HEAD", { cwd: __dirname, stdio: ["ignore", "pipe", "ignore"] })
+      .toString()
+      .trim();
+    if (/^[0-9a-f]{4,40}$/.test(sha)) return sha;
+  } catch {
+    /* not a git checkout */
+  }
+  const iso = new Date().toISOString();
+  return `b${iso.slice(0, 10).replace(/-/g, "")}-${iso.slice(11, 16).replace(":", "")}`;
+}
+
 export default defineConfig({
+  define: {
+    __APP_VERSION__: JSON.stringify(buildId()),
+  },
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: {

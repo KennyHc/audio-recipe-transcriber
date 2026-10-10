@@ -439,3 +439,72 @@ describe("public recipes: only the API writes", () => {
     await assertSucceeds(deleteAll());
   });
 });
+
+// ---------------------------------------------------------------------------------------
+// Round 2: recipe source link, shopping list, creator pages
+// ---------------------------------------------------------------------------------------
+
+describe("recipe source link", () => {
+  it("the owner can set, change, or clear the link on its own", async () => {
+    const db = as("alice");
+    await assertSucceeds(updateDoc(doc(db, "recipes/r1"), { sourceUrl: "https://www.youtube.com/watch?v=abc" }));
+    await assertSucceeds(updateDoc(doc(db, "recipes/r1"), { sourceUrl: null }));
+  });
+
+  it("not with other fields, not a non-http value, not someone else's recipe", async () => {
+    await assertFails(updateDoc(doc(as("alice"), "recipes/r1"), { sourceUrl: "https://x.example", title: "Renamed" }));
+    await assertFails(updateDoc(doc(as("alice"), "recipes/r1"), { sourceUrl: "javascript:alert(1)" }));
+    await assertFails(updateDoc(doc(as("alice"), "recipes/r1"), { sourceUrl: `https://x.example/${"a".repeat(600)}` }));
+    await assertFails(updateDoc(doc(as("bob"), "recipes/r1"), { sourceUrl: "https://x.example" }));
+  });
+});
+
+describe("shopping list", () => {
+  const list = {
+    items: [
+      {
+        id: "i1",
+        item: "garlic",
+        quantity: 4,
+        unit: "clove",
+        note: null,
+        sources: [{ recipeId: "r1", title: "Garlic noodles", isPublic: false }],
+        checked: false,
+        addedAt: NOW,
+      },
+    ],
+    updatedAt: NOW,
+  };
+
+  it("each user reads and writes only their own list", async () => {
+    await assertSucceeds(setDoc(doc(as("alice"), "users/alice/lists/shopping"), list));
+    await assertSucceeds(getDoc(doc(as("alice"), "users/alice/lists/shopping")));
+    await assertFails(getDoc(doc(as("bob"), "users/alice/lists/shopping")));
+    await assertFails(setDoc(doc(as("bob"), "users/alice/lists/shopping"), list));
+    await assertFails(setDoc(doc(anon(), "users/alice/lists/shopping"), list));
+  });
+
+  it("only the 'shopping' doc, with the expected keys and ≤300 items", async () => {
+    const db = as("alice");
+    await assertFails(setDoc(doc(db, "users/alice/lists/other"), list));
+    await assertFails(setDoc(doc(db, "users/alice/lists/shopping"), { ...list, extra: 1 }));
+    await assertFails(
+      setDoc(doc(db, "users/alice/lists/shopping"), { items: Array.from({ length: 301 }, () => list.items[0]), updatedAt: NOW }),
+    );
+  });
+
+  it("the list doesn't open up likes/saves or the user doc", async () => {
+    await assertFails(setDoc(doc(as("alice"), "users/alice/likes/x"), { likedAt: NOW }));
+    await assertFails(updateDoc(doc(as("alice"), "users/alice"), { "usage.recipesCreated": 0 }));
+  });
+});
+
+describe("creator pages", () => {
+  beforeEach(seedPublic);
+
+  it("anyone lists a creator's live public recipes", async () => {
+    await assertSucceeds(
+      getDocs(query(explore(anon()), where("handle", "==", "alice"))),
+    );
+  });
+});

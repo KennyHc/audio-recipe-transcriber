@@ -23,6 +23,10 @@ export interface JobProgress {
   awaitingModelConsent?: boolean;
 }
 
+export interface UploadOptions {
+  sourceUrl?: string | null;
+}
+
 export interface Backend {
   kind: BackendKind;
 
@@ -41,10 +45,13 @@ export interface Backend {
   /** A URL the <audio> element can play (a server URL, or an object URL for a stored Blob). */
   getAudioUrl(id: string): Promise<string>;
 
-  /** Create a job from an audio file. `onProgress` reports upload/storage progress (0..1). */
+  /** Create a job from an audio file. `onProgress` reports upload/storage progress (0..1).
+   * `options.sourceUrl` (cloud mode only; ignored elsewhere): the video/page link entered at
+   * upload, kept with the local job and sent with POST /recipes. */
   uploadAudio(
     file: File,
     onProgress: (fraction: number) => void,
+    options?: UploadOptions,
   ): { promise: Promise<Job>; cancel: () => void };
 
   /** Current stage detail for a running job, or null (server backend: always null). */

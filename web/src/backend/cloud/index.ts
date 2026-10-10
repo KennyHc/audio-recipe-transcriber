@@ -13,6 +13,9 @@ import { createRecipeStore } from "./store";
 import { createCloudBackend, type UsageCache } from "./backend";
 import { createAccount } from "./account";
 import { createPublicBank } from "./publicBank";
+import { createCloudShoppingStore, firestoreShoppingIO } from "./shoppingList";
+import type { ShoppingListStore } from "../shoppingList";
+import { errorReporter } from "@/lib/errorReporting";
 
 function createUsageCache(): UsageCache {
   let me: MeResponse | null = null;
@@ -27,7 +30,12 @@ function createUsageCache(): UsageCache {
   };
 }
 
-export function createCloudRuntime(): { backend: Backend; account: Account; publicBank: PublicBank } {
+export function createCloudRuntime(): {
+  backend: Backend;
+  account: Account;
+  publicBank: PublicBank;
+  shoppingList: ShoppingListStore;
+} {
   const firebase = initFirebase();
   const { auth } = firebase;
   const usage = createUsageCache();
@@ -44,7 +52,12 @@ export function createCloudRuntime(): { backend: Backend; account: Account; publ
     isSignedIn: () => auth.currentUser !== null,
     getAppCheckToken: firebase.getAppCheckToken,
     knownLimit: () => usage.get()?.usage.limit,
+    onUnexpectedFailure: (route, error) => {
+      errorReporter.report({ kind: "api", stage: route, code: error.code, error });
+    },
   });
+  // Error reports go to the API (fire-and-forget; see lib/errorReporting.ts).
+  errorReporter.setSender((report) => api.reportClientError(report));
 
   const store = createRecipeStore(firebase.firestore);
 
@@ -85,5 +98,10 @@ export function createCloudRuntime(): { backend: Backend; account: Account; publ
       return recipe;
     },
   };
-  return { backend, account, publicBank };
+  const shoppingList = createCloudShoppingStore({
+    subscribeUid: (listener) => account.subscribe((user) => listener(user === undefined ? undefined : (user?.uid ?? null))),
+    io: firestoreShoppingIO(firebase.firestore),
+  });
+
+  return { backend, account, publicBank, shoppingList };
 }

@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import type { Recipe } from "@recipe/shared";
 import { WarningsPanel, type WarningsAudience } from "@/components/WarningsPanel";
 import { IngredientList } from "@/components/IngredientList";
@@ -14,6 +15,7 @@ export function RecipeView({
   checkedIngredients,
   onToggleIngredient,
   audience = "owner",
+  ingredientsAction,
 }: {
   recipe: Recipe;
   unitSystem: UnitSystem;
@@ -24,6 +26,8 @@ export function RecipeView({
   onToggleIngredient: (i: number) => void;
   /** Wording of the warnings panel ("public" on published recipe pages). */
   audience?: WarningsAudience;
+  /** Shown beside the "Ingredients" heading (e.g. Add to shopping list). */
+  ingredientsAction?: ReactNode;
 }) {
   return (
     <div className="print-area space-y-6">
@@ -31,9 +35,10 @@ export function RecipeView({
 
       <div className="grid grid-cols-1 lg:grid-cols-[340px_1fr] gap-8">
         <section className="lg:sticky lg:top-[64px] lg:self-start lg:max-h-[calc(100vh-88px)] lg:overflow-y-auto rounded-[10px] lg:border lg:border-[hsl(var(--border-strong))] lg:bg-[hsl(var(--surface))] lg:p-4">
-          <h2 className="text-[12px] font-medium uppercase tracking-[0.08em] text-[hsl(var(--ink-muted))] mb-2">
-            Ingredients
-          </h2>
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <h2 className="text-[12px] font-medium uppercase tracking-[0.08em] text-[hsl(var(--ink-muted))]">Ingredients</h2>
+            {ingredientsAction && <div className="-my-1 -mr-1 shrink-0">{ingredientsAction}</div>}
+          </div>
           <IngredientList
             ingredients={recipe.ingredients}
             unitSystem={unitSystem}

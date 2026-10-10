@@ -11,7 +11,7 @@ import type { CloudRecipe, Usage } from "@recipe/shared";
 import type { FinishStep } from "../browser/runner";
 import * as db from "../browser/db";
 import type { ApiClient } from "./api";
-import { forgetLocalJob } from "./localJobs";
+import { forgetLocalJob, localJobSourceUrl } from "./localJobs";
 
 export interface CloudFinishDeps {
   api: Pick<ApiClient, "createRecipe">;
@@ -35,10 +35,12 @@ export function createCloudFinish(deps: CloudFinishDeps): FinishStep {
     }
 
     await ctx.setStage("extracting", MAKING_RECIPE_LABEL);
+    const sourceUrl = localJobSourceUrl(jobId);
     const res = await deps.api.createRecipe({
       id: jobId,
       fileName: job.fileName.slice(0, 300),
       transcript,
+      ...(sourceUrl ? { sourceUrl } : {}),
     });
 
     deps.onRecipeSaved(uid, res.recipe);

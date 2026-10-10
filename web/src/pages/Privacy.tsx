@@ -5,7 +5,7 @@ import { IS_CLOUD, IS_HOSTED } from "@/lib/mode";
 import { CONTACT_EMAIL } from "@/lib/contact";
 import { termsHref } from "@/lib/router";
 
-const LAST_UPDATED = IS_CLOUD ? "October 9, 2026" : "October 4, 2026";
+const LAST_UPDATED = "October 10, 2026";
 
 function SectionLabel({ children }: { children: ReactNode }) {
   return (
@@ -73,8 +73,8 @@ export function Privacy() {
             <p className="text-[hsl(var(--ink))] leading-relaxed">
               When you sign in (with Google or an emailed link), we store your account's email
               address, plus your name and profile picture if Google provides them. We also store
-              your recipes, every saved version of them, their transcripts, and a count of how
-              many recipes you've made this month (for the free limit).
+              your recipes, every saved version of them, their transcripts, your shopping list, and a
+              count of how many recipes you've made this month (for the free limit).
             </p>
             <p className="text-[hsl(var(--ink))] leading-relaxed">
               This is kept in Google Cloud Firestore in the EU (Firebase, multi-region eur3), and
@@ -126,6 +126,26 @@ export function Privacy() {
           </section>
 
           <section className="space-y-2">
+            <SectionLabel>Error reports</SectionLabel>
+            <p className="text-[hsl(var(--ink))] leading-relaxed">
+              When something breaks — a recipe fails to process, the speech model won't download, our
+              server doesn't answer, or the page hits an unexpected error — your browser sends us a
+              short error report so we can fix it. It contains only: the kind of error and the step
+              it happened in (for example “transcribing”), an error code, a short error message with
+              anything personal stripped out, which version of the app you're on, and basic facts
+              about your browser and device (its user-agent string, whether it supports WebGPU, its
+              approximate memory, and whether it's a phone). At most a few are sent per visit.
+            </p>
+            <p className="text-[hsl(var(--ink))] leading-relaxed">
+              Error reports never include your audio, transcripts, recipe text, file names, email
+              address, account or recipe ids, or web addresses. They aren't stored in your account or
+              any database — they're written only to our server's logs (Google Cloud Logging), which
+              keep them for 30 days and then delete them. Like reports, they're rate-limited using a
+              one-way hash of your IP address, never the address itself.
+            </p>
+          </section>
+
+          <section className="space-y-2">
             <SectionLabel>Download or delete anytime</SectionLabel>
             <p className="text-[hsl(var(--ink))] leading-relaxed">
               Settings → "Download all my data" gives you every recipe, version, and transcript as
@@ -148,8 +168,9 @@ export function Privacy() {
             your device — your audio is never uploaded anywhere for transcription.
           </p>
           <p className="text-[hsl(var(--ink))] leading-relaxed">
-            Settings → "Delete all local data" removes all of it: every recipe, transcript, and
-            audio file, the downloaded speech model, and your saved settings.
+            Your shopping list is kept in this browser's local storage. Settings → "Delete all
+            local data" removes all of it: every recipe, transcript, and audio file, your shopping
+            list, the downloaded speech model, and your saved settings.
           </p>
         </section>
       )}

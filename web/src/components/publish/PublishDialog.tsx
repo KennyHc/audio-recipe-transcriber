@@ -17,6 +17,7 @@ import {
   createSuggestionsLoader,
   detectVideo,
   formFromSnapshot,
+  formFromSourceUrl,
   handleProblem,
   normalizeHandle,
   normalizeUrl,
@@ -180,6 +181,8 @@ export interface PublishDialogProps {
   onPublished: (pub: PublicRecipe) => void;
   /** "fixSource": opened from "Change source" on a recipe held in review (focuses the link). */
   intent?: "details" | "fixSource";
+  /** The recipe's saved video/page link; prefills the source when there's no snapshot yet. */
+  sourceUrl?: string | null;
 }
 
 export function PublishDialog({
@@ -190,6 +193,7 @@ export function PublishDialog({
   needsHandle,
   onPublished,
   intent = "details",
+  sourceUrl = null,
 }: PublishDialogProps) {
   const [form, setForm] = useState<PublishForm>(EMPTY_FORM);
   const [preview, setPreview] = useState<PreviewState>({ status: "idle" });
@@ -208,7 +212,7 @@ export function PublishDialog({
   // Fresh form each time it opens (pre-filled when editing a published recipe).
   useEffect(() => {
     if (!open) return;
-    setForm(existing ? formFromSnapshot(existing, needsHandle) : { ...EMPTY_FORM, needsHandle });
+    setForm(existing ? formFromSnapshot(existing, needsHandle) : formFromSourceUrl(sourceUrl, needsHandle));
     setPreview({ status: "idle" });
     setError(null);
     setDuplicateId(null);
@@ -220,7 +224,7 @@ export function PublishDialog({
       : null;
     tagsTouched.current = false;
     firstPublish.current = existing === null;
-  }, [open, existing, needsHandle, recipeId]);
+  }, [open, existing, needsHandle, recipeId, sourceUrl]);
 
   const update = (patch: Partial<PublishForm>) => setForm((f) => ({ ...f, ...patch }));
   const setTags = (tags: string[]) => {

@@ -11,8 +11,9 @@ import { extractRecipe, ExtractionError, verifyRecipe, VerificationError } from 
 import { transcribeAudio } from "./transcribe";
 import { reloadSettings } from "./settings";
 import { isModelCached } from "./modelCatalog";
-import { ensureModelDownloaded } from "./modelDownloader";
-import { describeTranscriptionError } from "./downloadErrors";
+import { ensureModelDownloaded, InsufficientStorageError } from "./modelDownloader";
+import { describeTranscriptionError, isNetworkFailureMessage } from "./downloadErrors";
+import { errorCodeOf, errorReporter } from "@/lib/errorReporting";
 import { formatProcessingSummary, startHiddenTracking } from "@/lib/processingHealth";
 import type { WorkerProgress } from "./whisper.worker";
 
@@ -56,8 +57,27 @@ function setProgress(jobId: string, progress: JobProgress | null): void {
   }
 }
 
+// The stage each running job is in, so a failure can be reported with where it happened.
+const stageByJob = new Map<string, JobStatus>();
+
 async function setStatus(jobId: string, status: JobStatus): Promise<void> {
+  stageByJob.set(jobId, status);
   await db.updateJob(jobId, { status });
+}
+
+function isAbortError(err: unknown): boolean {
+  return typeof err === "object" && err !== null && (err as { name?: unknown }).name === "AbortError";
+}
+
+/** A 4xx from the Cloud Run API (quota, sign-in, too long…) is an answer for the user, not a bug. */
+function isUserFacingApiError(err: unknown): boolean {
+  const status = typeof err === "object" && err !== null ? (err as { status?: unknown }).status : undefined;
+  return typeof status === "number" && status >= 400 && status < 500;
+}
+
+function reportPipelineFailure(jobId: string, err: unknown): void {
+  if (errorReporter.wasReported(err) || isAbortError(err) || isUserFacingApiError(err)) return;
+  errorReporter.report({ kind: "pipeline", stage: stageByJob.get(jobId) ?? null, code: errorCodeOf(err), error: err });
 }
 
 async function setError(jobId: string, message: string): Promise<void> {
@@ -183,7 +203,17 @@ async function transcribeAndSave(jobId: string): Promise<void> {
   } catch (err) {
     stopHiddenTracking();
     const message = err instanceof Error ? err.message : String(err);
-    throw new Error(describeTranscriptionError(message));
+    const friendly = new Error(describeTranscriptionError(message));
+    if (!isAbortError(err)) {
+      errorReporter.report({
+        kind: "model_download",
+        stage: "download",
+        code: err instanceof InsufficientStorageError ? "insufficient_storage" : isNetworkFailureMessage(message) ? "network" : errorCodeOf(err),
+        error: err,
+      });
+    }
+    errorReporter.markReported(friendly);
+    throw friendly;
   }
 
   const onProgress = (p: WorkerProgress) => {
@@ -218,6 +248,7 @@ async function transcribeAndSave(jobId: string): Promise<void> {
 // poll loop would see a stale "done"/"error" and stop.
 async function markQueued(jobId: string): Promise<void> {
   runningJobIds.add(jobId);
+  stageByJob.set(jobId, "queued");
   setProgress(jobId, { label: STAGE_LABEL.queued, fraction: null });
   await db.updateJob(jobId, { status: "queued", error: null });
 }
@@ -226,9 +257,11 @@ async function guarded(jobId: string, task: () => Promise<void>): Promise<void> 
   try {
     await task();
   } catch (err) {
+    reportPipelineFailure(jobId, err);
     const message = err instanceof Error ? err.message : String(err);
     await setError(jobId, message).catch(() => undefined);
   } finally {
+    stageByJob.delete(jobId);
     runningJobIds.delete(jobId);
     setProgress(jobId, null);
   }
@@ -313,6 +346,10 @@ export async function recoverInterruptedJobs(): Promise<void> {
   const TERMINAL: JobStatus[] = ["done", "error"];
   for (const job of jobs) {
     if (!TERMINAL.includes(job.status)) {
+      // A job paused at "queued" was usually waiting for the model-download OK — not a failure.
+      if (job.status !== "queued") {
+        errorReporter.report({ kind: "pipeline", stage: job.status, code: "interrupted", error: "Interrupted: the tab was closed while processing" });
+      }
       await setError(job.id, "Interrupted — the tab was closed while processing. Press Retry.").catch(() => undefined);
     }
   }

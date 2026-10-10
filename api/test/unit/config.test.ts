@@ -13,9 +13,14 @@ describe("loadConfig", () => {
       screeningModel: "claude-haiku-4-5",
       dailyBudgetUsd: 2,
       freeMonthlyRecipes: 30,
-      allowedOrigins: ["https://recipe-transcriber.pages.dev"],
+      allowedOrigins: [
+        "https://recipe-transcriber.pages.dev",
+        "https://recipe-transcriber-eu.web.app",
+        "https://recipe-transcriber-eu.firebaseapp.com",
+      ],
       requireAppCheck: true,
       reportSalt: "test-salt-not-real",
+      publicSiteOrigin: "https://recipe-transcriber-eu.web.app",
     });
   });
 

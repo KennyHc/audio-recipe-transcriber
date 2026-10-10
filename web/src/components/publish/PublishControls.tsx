@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { ExternalLink, Globe, Link2, Loader2, RefreshCw, Settings2, Undo2 } from "lucide-react";
+import { ExternalLink, Globe, Link2, Loader2, RefreshCw, Settings2, Sparkles, Undo2, X } from "lucide-react";
 import type { PublicRecipe } from "@recipe/shared";
 import { account, publicBank } from "@/backend";
 import { hasUnpublishedChanges, reviewNotice, updateRequestFromSnapshot, type ReviewNotice } from "@/lib/publish";
@@ -17,6 +17,8 @@ import {
 } from "@/components/ui/dialog";
 import { PublishDialog } from "./PublishDialog";
 import { PublicStatusPill } from "./PublicStatusPill";
+import { SourceLinkRow } from "./SourceLinkRow";
+import { markReadyNoteSeen, showReadyNote, wasReadyNoteSeen } from "@/lib/nudges";
 
 const NOTE_LINK = "text-[hsl(var(--accent-text))] underline underline-offset-2";
 
@@ -64,8 +66,21 @@ export function ReviewNoticeText({ notice }: { notice: ReviewNotice }) {
  * has newer edits), details, and Unpublish. The snapshot is read from Firestore
  * (publicRecipes/{same id}); the owner can read it in any status.
  */
-export function PublishControls({ recipeId, privateVersion }: { recipeId: string; privateVersion: number | null }) {
+export function PublishControls({
+  recipeId,
+  privateVersion,
+  justFinished = false,
+}: {
+  recipeId: string;
+  privateVersion: number | null;
+  /** The recipe finished processing while this page was open (shows "Recipe ready — share it?"). */
+  justFinished?: boolean;
+}) {
   const [pub, setPub] = useState<PublicRecipe | null | undefined>(undefined);
+  const [sourceUrl, setSourceUrl] = useState<string | null>(null);
+  const [readyNote, setReadyNote] = useState(false);
+  /** Which recipe `pub` was loaded for (so a stale snapshot never decides the ready note). */
+  const [loadedFor, setLoadedFor] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogIntent, setDialogIntent] = useState<"details" | "fixSource">("details");
   const [needsHandle, setNeedsHandle] = useState(false);
@@ -77,15 +92,38 @@ export function PublishControls({ recipeId, privateVersion }: { recipeId: string
     if (!publicBank) return;
     publicBank
       .getPublicRecipe(recipeId)
-      .then(setPub)
-      .catch(() => setPub(null));
+      .catch(() => null)
+      .then((p) => {
+        setPub(p);
+        setLoadedFor(recipeId);
+      });
+    publicBank
+      .getSourceUrl(recipeId)
+      .then(setSourceUrl)
+      .catch(() => setSourceUrl(null));
   }, [recipeId]);
 
   useEffect(() => {
     setPub(undefined);
+    setLoadedFor(null);
+    setSourceUrl(null);
+    setReadyNote(false);
     setError(null);
     load();
   }, [load]);
+
+  // "Recipe ready — share it in the bank?": once per recipe, right after it finished.
+  useEffect(() => {
+    if (pub === undefined || loadedFor !== recipeId) return;
+    if (pub !== null) {
+      setReadyNote(false);
+      return;
+    }
+    if (showReadyNote({ justFinished, published: false, seen: wasReadyNoteSeen(recipeId) })) {
+      setReadyNote(true);
+      markReadyNoteSeen(recipeId);
+    }
+  }, [justFinished, pub, loadedFor, recipeId]);
 
   if (!publicBank || pub === undefined) return null;
   const bank = publicBank;
@@ -138,7 +176,31 @@ export function PublishControls({ recipeId, privateVersion }: { recipeId: string
 
   return (
     <div className="no-print space-y-1.5">
-      {pub === null ? (
+      <SourceLinkRow recipeId={recipeId} value={sourceUrl} onChange={setSourceUrl} />
+      {pub === null && readyNote ? (
+        // Just finished: the same Publish row, as a gentle one-time nudge (dismissible).
+        <div
+          role="status"
+          className="inline-flex max-w-full flex-wrap items-center gap-x-2.5 gap-y-1.5 rounded-[10px] border border-[hsl(var(--accent-tint-strong))] bg-[hsl(var(--accent-tint))] py-1.5 pl-1.5 pr-1 text-sm"
+        >
+          <Button size="sm" onClick={() => openDialog()} disabled={busy === "open"}>
+            {busy === "open" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Globe className="h-3.5 w-3.5" />}
+            Publish…
+          </Button>
+          <span className="inline-flex items-center gap-1.5 text-[hsl(var(--ink))]">
+            <Sparkles className="h-3.5 w-3.5 shrink-0 text-[hsl(var(--accent-text))]" />
+            Recipe ready — share it in the bank?
+          </span>
+          <button
+            type="button"
+            aria-label="Dismiss"
+            onClick={() => setReadyNote(false)}
+            className="inline-flex h-7 w-7 items-center justify-center rounded-[6px] text-[hsl(var(--ink-faint))] transition-colors hover:bg-[hsl(var(--accent-tint-strong))] hover:text-[hsl(var(--ink))]"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      ) : pub === null ? (
         <div className="flex flex-wrap items-center gap-2">
           <Button size="sm" variant="outline" onClick={() => openDialog()} disabled={busy === "open"}>
             {busy === "open" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Globe className="h-3.5 w-3.5" />}
@@ -202,6 +264,7 @@ export function PublishControls({ recipeId, privateVersion }: { recipeId: string
         existing={pub}
         needsHandle={needsHandle}
         intent={dialogIntent}
+        sourceUrl={sourceUrl}
         onPublished={(p) => {
           setPub(p);
           // The handle is now set; refresh the cached /me next time.

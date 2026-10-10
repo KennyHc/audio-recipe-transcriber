@@ -66,6 +66,7 @@ export async function createRecipe(
       updatedAt: nowIso,
       currentVersion: 1,
       latest: recipe,
+      sourceUrl: body.sourceUrl ?? null,
     };
     const version: VersionedRecipe = {
       meta: { version: 1, source: "extracted", createdAt: nowIso, note: null },

@@ -2,6 +2,7 @@ import type { Backend } from "./types";
 import { createServerBackend } from "./server";
 import type { Account } from "./account";
 import type { PublicBank } from "./publicBank";
+import { createLocalShoppingStore, type ShoppingListStore } from "./shoppingList";
 
 // The build-time mode switch. Vite inlines `import.meta.env.VITE_BACKEND` as a string
 // literal at build time, so `npm run build` (VITE_BACKEND unset → "server" branch) never
@@ -14,7 +15,12 @@ import type { PublicBank } from "./publicBank";
 // The cost is that module evaluation — and therefore first paint — waits for the dynamic
 // import to resolve in browser mode; that's a one-time, same-tick cost since the import
 // itself is local code (no network round trip beyond the browser backend's own chunk).
-async function resolveRuntime(): Promise<{ backend: Backend; account: Account | null; publicBank: PublicBank | null }> {
+async function resolveRuntime(): Promise<{
+  backend: Backend;
+  account: Account | null;
+  publicBank: PublicBank | null;
+  shoppingList?: ShoppingListStore;
+}> {
   // "cloud" (signed-in SaaS) — Firebase is only ever reachable through this branch, so the
   // other builds don't contain it (same dead-code elimination as below).
   if (import.meta.env.VITE_BACKEND === "cloud") {
@@ -37,7 +43,10 @@ export const backend: Backend = runtime.backend;
 export const account: Account | null = runtime.account;
 /** The public recipe bank in cloud mode (works signed out); null in every other mode. */
 export const publicBank: PublicBank | null = runtime.publicBank;
+/** The shopping list: Firestore (per account) in cloud mode, this browser's localStorage otherwise. */
+export const shoppingList: ShoppingListStore = runtime.shoppingList ?? createLocalShoppingStore();
 
 export * from "./types";
 export type { Account, AccountUser } from "./account";
 export type { PublicBank, ExplorePage, SavedEntry } from "./publicBank";
+export type { ShoppingListStore, ShoppingListState } from "./shoppingList";

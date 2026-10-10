@@ -15,6 +15,11 @@ export interface Config {
    * Required in production (Secret Manager `report-salt`); a fixed dev value on emulators.
    */
   reportSalt: string;
+  /**
+   * The Firebase Hosting site that rewrites /r/** to this API for link previews: its
+   * index.html is fetched from here and it's the origin used in og:url.
+   */
+  publicSiteOrigin: string;
 }
 
 /** Thrown at startup; the message names the variable but never echoes its value. */
@@ -26,7 +31,12 @@ export class ConfigError extends Error {
 }
 
 const DEFAULT_MODEL = "claude-haiku-4-5";
-const DEFAULT_ORIGINS = ["https://recipe-transcriber.pages.dev"];
+const DEFAULT_ORIGINS = [
+  "https://recipe-transcriber.pages.dev",
+  "https://recipe-transcriber-eu.web.app",
+  "https://recipe-transcriber-eu.firebaseapp.com",
+];
+const DEFAULT_PUBLIC_SITE_ORIGIN = "https://recipe-transcriber-eu.web.app";
 /** Emulator-only fallback for REPORT_SALT (local data, nothing to protect). */
 const DEV_REPORT_SALT = "dev-report-salt-emulator-only";
 /** Vite dev/preview ports (web/package.json), allowed only when running against emulators. */
@@ -54,6 +64,11 @@ export function loadConfig(env: Env): Config {
   const reportSalt = (env.REPORT_SALT ?? "").trim() || (emulator ? DEV_REPORT_SALT : "");
   if (!reportSalt) throw new ConfigError("REPORT_SALT is not set");
 
+  const publicSiteOrigin = nonEmptyOr(env.PUBLIC_SITE_ORIGIN, DEFAULT_PUBLIC_SITE_ORIGIN).replace(/\/+$/, "");
+  if (!/^https:\/\/[^/]+$/.test(publicSiteOrigin) && !(emulator && /^http:\/\/[^/]+$/.test(publicSiteOrigin))) {
+    throw new ConfigError("PUBLIC_SITE_ORIGIN must be an https origin (no path)");
+  }
+
   const configuredOrigins = isSet(env.ALLOWED_ORIGINS)
     ? env
         .ALLOWED_ORIGINS!.split(",")
@@ -72,6 +87,7 @@ export function loadConfig(env: Env): Config {
     allowedOrigins,
     requireAppCheck,
     reportSalt,
+    publicSiteOrigin,
   };
   assertValidConfig(config);
   return config;

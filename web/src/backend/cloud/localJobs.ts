@@ -38,6 +38,7 @@ export function localJobOwner(jobId: string): string | null {
 }
 
 export function forgetLocalJob(jobId: string): void {
+  forgetLocalJobSourceUrl(jobId);
   const map = read();
   if (!(jobId in map)) return;
   delete map[jobId];
@@ -46,4 +47,45 @@ export function forgetLocalJob(jobId: string): void {
 
 export function clearLocalJobOwners(): void {
   write({});
+  writeSources({});
+}
+
+// The video/page link entered at upload, kept with the pending local job until POST /recipes
+// sends it (so a Retry after a failed POST still sends it).
+
+const SOURCES_KEY = "recipe-transcriber:cloud-job-sources";
+let sourcesMemory: Record<string, string> = {};
+
+function readSources(): Record<string, string> {
+  try {
+    const raw = localStorage.getItem(SOURCES_KEY);
+    return raw ? (JSON.parse(raw) as Record<string, string>) : {};
+  } catch {
+    return sourcesMemory;
+  }
+}
+
+function writeSources(map: Record<string, string>): void {
+  sourcesMemory = map;
+  try {
+    localStorage.setItem(SOURCES_KEY, JSON.stringify(map));
+  } catch {
+    /* storage unavailable — the in-memory copy lasts for this page */
+  }
+}
+
+export function setLocalJobSourceUrl(jobId: string, sourceUrl: string): void {
+  writeSources({ ...readSources(), [jobId]: sourceUrl });
+}
+
+export function localJobSourceUrl(jobId: string): string | null {
+  const v = readSources()[jobId];
+  return typeof v === "string" && v ? v : null;
+}
+
+function forgetLocalJobSourceUrl(jobId: string): void {
+  const map = readSources();
+  if (!(jobId in map)) return;
+  delete map[jobId];
+  writeSources(map);
 }

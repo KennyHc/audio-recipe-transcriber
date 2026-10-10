@@ -16,6 +16,7 @@ import {
   ReextractResponse,
   SourcePreview,
   type AdminActionRequest,
+  type ClientErrorReport,
   type CreateRecipeRequest,
   type ImportRequest,
   type PublishRequest,
@@ -38,6 +39,10 @@ export interface ApiClientDeps {
   getAppCheckToken(): Promise<string>;
   /** The monthly limit, if known, for the quota message. */
   knownLimit?(): number | undefined;
+  /** Called for failures that aren't the user's doing: no network, 5xx, or an unreadable
+   * response (never for 4xx like quota_exceeded). `route` is a template without ids, e.g.
+   * "POST /recipes/:id/publish". Used for error reporting (lib/errorReporting.ts). */
+  onUnexpectedFailure?(route: string, error: CloudApiError): void;
   fetch?: typeof fetch;
 }
 
@@ -61,6 +66,10 @@ export interface ApiClient {
   report(publicId: string, body: ReportRequest): Promise<void>;
   adminQueue(): Promise<AdminQueueResponse>;
   adminAction(publicId: string, body: AdminActionRequest): Promise<void>;
+
+  /** POST /client-errors (shared/telemetry.ts). App Check only; ID token when signed in. Uses a
+   * keepalive fetch so it survives the page unloading; never reports its own failures. */
+  reportClientError(body: ClientErrorReport): Promise<void>;
 }
 
 type Method = "GET" | "POST" | "DELETE";
@@ -69,6 +78,46 @@ interface RequestOptions {
   forceRefreshToken?: boolean;
   /** "optional": send the ID token only when signed in (public routes). */
   auth?: "required" | "optional";
+  keepalive?: boolean;
+  /** Don't call onUnexpectedFailure (the error-report route itself). */
+  quiet?: boolean;
+}
+
+// Path segments that are part of the API's routes; anything else in a path is an id.
+const STATIC_SEGMENTS = new Set([
+  "recipes",
+  "reextract",
+  "import",
+  "me",
+  "sources",
+  "preview",
+  "publish",
+  "suggestions",
+  "public",
+  "like",
+  "save",
+  "copy",
+  "report",
+  "admin",
+  "queue",
+  "client-errors",
+  "creators",
+  "handle",
+]);
+
+/** "POST /recipes/abc123/publish?x=1" → "POST /recipes/:id/publish" (no ids, no query). */
+export function routeTemplate(method: string, path: string): string {
+  const clean = path.split("?")[0]!;
+  const segments = clean
+    .split("/")
+    .filter(Boolean)
+    .map((seg) => (STATIC_SEGMENTS.has(seg) ? seg : ":id"));
+  return `${method} /${segments.join("/")}`;
+}
+
+/** Network failures, 5xx, and unreadable responses — not the 4xx answers users are meant to see. */
+export function isUnexpectedFailure(error: CloudApiError): boolean {
+  return error.code === "network" || error.code === "bad_response" || error.status >= 500;
 }
 
 const enc = encodeURIComponent;
@@ -96,12 +145,35 @@ export function createApiClient(deps: ApiClientDeps): ApiClient {
     if (idToken) headers.Authorization = `Bearer ${idToken}`;
     if (body !== undefined) headers["Content-Type"] = "application/json";
 
+    try {
+      return await send<T>(method, path, schema, body, options, headers);
+    } catch (err) {
+      if (!options.quiet && err instanceof CloudApiError && isUnexpectedFailure(err)) {
+        try {
+          deps.onUnexpectedFailure?.(routeTemplate(method, path), err);
+        } catch {
+          /* reporting never breaks a request */
+        }
+      }
+      throw err;
+    }
+  }
+
+  async function send<T>(
+    method: Method,
+    path: string,
+    schema: Schema<T> | null,
+    body: unknown,
+    options: RequestOptions,
+    headers: Record<string, string>,
+  ): Promise<T> {
     let response: Response;
     try {
       response = await doFetch(`${base}${path}`, {
         method,
         headers,
         body: body === undefined ? undefined : JSON.stringify(body),
+        ...(options.keepalive ? { keepalive: true } : {}),
       });
     } catch {
       throw new CloudApiError("network", friendlyCloudMessage("network"), 0);
@@ -157,5 +229,7 @@ export function createApiClient(deps: ApiClientDeps): ApiClient {
     report: (publicId, body) => request<void>("POST", `/public/${enc(publicId)}/report`, null, body, { auth: "optional" }),
     adminQueue: () => request("GET", "/admin/queue", AdminQueueResponse),
     adminAction: (publicId, body) => request<void>("POST", `/admin/public/${enc(publicId)}`, null, body),
+    reportClientError: (body) =>
+      request<void>("POST", "/client-errors", null, body, { auth: "optional", keepalive: true, quiet: true }),
   };
 }

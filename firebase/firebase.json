@@ -12,6 +12,13 @@
     "cleanUrls": true,
     "rewrites": [
       {
+        "source": "/r/**",
+        "run": {
+          "serviceId": "api",
+          "region": "europe-west1"
+        }
+      },
+      {
         "source": "**",
         "destination": "/index.html"
       }

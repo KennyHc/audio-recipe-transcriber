@@ -1,6 +1,6 @@
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { exploreHref, privacyHref, termsHref, useRoute, type Route } from "@/lib/router";
+import { exploreHref, privacyHref, shoppingListHref, termsHref, useRoute, type Route } from "@/lib/router";
 import { Library } from "@/pages/Library";
 import { JobPage } from "@/pages/JobPage";
 import { Settings } from "@/pages/Settings";
@@ -8,7 +8,9 @@ import { Privacy } from "@/pages/Privacy";
 import { Terms } from "@/pages/Terms";
 import { Explore } from "@/pages/Explore";
 import { PublicRecipePage } from "@/pages/PublicRecipePage";
+import { CreatorPage } from "@/pages/CreatorPage";
 import { Admin } from "@/pages/Admin";
+import { ShoppingList } from "@/pages/ShoppingList";
 import { useState } from "react";
 import { account, backend } from "@/backend";
 import { IS_CLOUD, IS_HOSTED } from "@/lib/mode";
@@ -16,13 +18,13 @@ import { useAccountUser } from "@/lib/useAccount";
 import { AccountMenu } from "@/components/account/AccountMenu";
 import { SignedOutLanding } from "@/components/account/SignedOutLanding";
 import { EmailLinkLanding } from "@/components/account/EmailLinkLanding";
-import { Compass, Settings as SettingsIcon } from "lucide-react";
+import { Compass, Settings as SettingsIcon, ShoppingBasket } from "lucide-react";
 import { NoodlesLogo } from "@/components/NoodlesLogo";
 
 /** Pages anyone can open in cloud mode, signed in or not. */
-const OPEN_ROUTES: ReadonlySet<Route["name"]> = new Set(["privacy", "terms", "explore", "public"]);
+const OPEN_ROUTES: ReadonlySet<Route["name"]> = new Set(["privacy", "terms", "explore", "public", "creator"]);
 /** Pages that exist only in cloud mode (the public bank). */
-const CLOUD_ONLY_ROUTES: ReadonlySet<Route["name"]> = new Set(["explore", "admin"]);
+const CLOUD_ONLY_ROUTES: ReadonlySet<Route["name"]> = new Set(["explore", "admin", "creator"]);
 
 export default function App() {
   const rawRoute = useRoute();
@@ -51,8 +53,12 @@ export default function App() {
     <Terms />
   ) : route.name === "explore" ? (
     <Explore />
+  ) : route.name === "creator" ? (
+    <CreatorPage handle={route.handle} />
   ) : route.name === "public" ? (
     <PublicRecipePage id={route.id} />
+  ) : route.name === "list" ? (
+    <ShoppingList />
   ) : route.name === "admin" ? (
     <Admin />
   ) : route.name === "library" ? (
@@ -79,6 +85,16 @@ export default function App() {
                 <span className="hidden sm:inline text-xs text-[hsl(var(--ink-faint))] mr-1">
                   {IS_HOSTED ? "Free · runs in your browser" : backend.kind === "browser" ? "Runs in your browser" : "Local server"}
                 </span>
+              )}
+              {!IS_CLOUD && (
+                <a
+                  href={shoppingListHref()}
+                  aria-label="Shopping list"
+                  aria-current={route.name === "list" ? "page" : undefined}
+                  className="inline-flex h-9 w-9 items-center justify-center rounded-[8px] text-[hsl(var(--ink-muted))] transition-colors hover:bg-[hsl(var(--accent-tint))] hover:text-[hsl(var(--ink))] aria-[current=page]:text-[hsl(var(--accent-text))]"
+                >
+                  <ShoppingBasket className="h-4 w-4" />
+                </a>
               )}
               {backend.kind === "browser" && !IS_CLOUD && (
                 <a

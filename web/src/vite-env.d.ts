@@ -42,3 +42,7 @@ interface ImportMetaEnv {
 interface ImportMeta {
   readonly env: ImportMetaEnv;
 }
+
+/** Build id baked in by vite.config.ts (git short sha, else a UTC build timestamp). Sent with
+ * error reports (lib/errorReporting.ts). */
+declare const __APP_VERSION__: string;

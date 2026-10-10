@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { linkNavigation, parseHash, parseLocation, publicHref } from "./router";
+import { creatorHref, isPathRoute, linkNavigation, parseHash, parseLocation, publicHref } from "./router";
 
 describe("parseLocation", () => {
   it("the /r/{id} path is the public recipe page, whatever the hash", () => {
@@ -14,6 +14,7 @@ describe("parseLocation", () => {
     expect(parseLocation("/", "#/explore")).toEqual({ name: "explore" });
     expect(parseLocation("/", "#/terms")).toEqual({ name: "terms" });
     expect(parseLocation("/", "#/admin")).toEqual({ name: "admin" });
+    expect(parseLocation("/", "#/list")).toEqual({ name: "list" });
     expect(parseLocation("/", "")).toEqual({ name: "library" });
     expect(parseLocation("/r/", "#/settings")).toEqual({ name: "settings" });
     expect(parseLocation("/r/a/b", "")).toEqual({ name: "library" });
@@ -42,5 +43,26 @@ describe("linkNavigation (in-app links between path and hash routes)", () => {
     expect(linkNavigation("#/explore", "/")).toEqual({ kind: "default" });
     expect(linkNavigation("https://youtu.be/x", "/r/abc")).toEqual({ kind: "default" });
     expect(linkNavigation("mailto:a@b.c", "/")).toEqual({ kind: "default" });
+  });
+});
+
+describe("creator pages /@handle", () => {
+  it("the /@handle path is the creator page, whatever the hash", () => {
+    expect(parseLocation("/@chef_ann", "")).toEqual({ name: "creator", handle: "chef_ann" });
+    expect(parseLocation("/@chef_ann/", "#/explore")).toEqual({ name: "creator", handle: "chef_ann" });
+    expect(parseLocation("/%40chef_ann", "")).toEqual({ name: "creator", handle: "chef_ann" });
+    expect(parseLocation("/@", "")).toEqual({ name: "library" });
+    expect(parseLocation("/@a/b", "")).toEqual({ name: "library" });
+    expect(isPathRoute("/@chef_ann")).toBe(true);
+  });
+
+  it("creatorHref builds the path, and in-app links to it are pushed", () => {
+    expect(creatorHref("chef_ann")).toBe("/@chef_ann");
+    expect(linkNavigation(creatorHref("chef_ann"), "/")).toEqual({ kind: "push", url: "/@chef_ann" });
+    expect(linkNavigation("/r/abc", "/@chef_ann")).toEqual({ kind: "push", url: "/r/abc" });
+  });
+
+  it("hash links from a creator page go back to the root path", () => {
+    expect(linkNavigation("#/explore", "/@chef_ann")).toEqual({ kind: "push", url: "/#/explore" });
   });
 });

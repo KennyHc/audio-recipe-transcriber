@@ -10,6 +10,7 @@ import type {
   SourcePreview,
 } from "@recipe/shared";
 import type { ExploreParams } from "@/lib/explore";
+import type { CreatorTotals } from "@/lib/creator";
 
 // The public recipe bank, cloud mode only (Phase 2 — contract: shared/public.ts). Like Account,
 // this interface is free of Firebase types so pages can compile into every build; the
@@ -27,6 +28,12 @@ export interface ExplorePage {
   sortedByNewestForSearch: boolean;
 }
 
+export interface CreatorPage {
+  items: PublicRecipe[];
+  /** Pass back to load the next page; null when there are no more. Opaque. */
+  cursor: unknown | null;
+}
+
 export interface SavedEntry {
   id: string;
   savedAt: string | null;
@@ -38,6 +45,16 @@ export interface PublicBank {
   /** A live public recipe by id (or the caller's own / any for admins). null if unavailable. */
   getPublicRecipe(id: string): Promise<PublicRecipe | null>;
   explore(params: ExploreParams, cursor: unknown | null): Promise<ExplorePage>;
+  /** The newest few live public recipes (the signed-out landing's "Recently shared"). */
+  recentPublic(count: number): Promise<PublicRecipe[]>;
+  /** A creator's live public recipes, newest first (works signed out). */
+  listByCreator(handle: string, cursor: unknown | null): Promise<CreatorPage>;
+  /** Recipe count + like/save totals over all of a creator's live public recipes; null if unknown. */
+  creatorTotals(handle: string): Promise<CreatorTotals | null>;
+  /** The private recipe's video/page link (recipes/{id}.sourceUrl), owner only. */
+  getSourceUrl(recipeId: string): Promise<string | null>;
+  /** Sets or clears it (written straight to Firestore; the rules allow this one field alone). */
+  setSourceUrl(recipeId: string, sourceUrl: string | null): Promise<void>;
   /** The signed-in user's published snapshots, by id (for "Published" badges). */
   listOwnPublished(): Promise<Map<string, PublicRecipe>>;
   /** The signed-in user's saved recipes, newest save first. */

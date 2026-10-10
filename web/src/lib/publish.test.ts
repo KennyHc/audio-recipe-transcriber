@@ -10,6 +10,7 @@ import {
   suggestionSourceUrl,
   detectVideo,
   formFromSnapshot,
+  formFromSourceUrl,
   formatOffset,
   handleProblem,
   hasUnpublishedChanges,
@@ -308,5 +309,21 @@ describe("publish suggestions", () => {
     expect(await loader.load(yt)).toBeNull();
     expect(await loader.load(yt)).toBeNull();
     expect(fetch).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("formFromSourceUrl (first publish, prefilled from the link entered at upload)", () => {
+  it("prefills the video link, still editable, and the result builds a valid request", () => {
+    const form = formFromSourceUrl("https://www.youtube.com/watch?v=qH__o17xHls", true);
+    expect(form).toMatchObject({ sourceKind: "video", videoUrl: "https://www.youtube.com/watch?v=qH__o17xHls", needsHandle: true });
+    const built = buildPublishRequest({ ...form, handle: "chef_ann" });
+    expect(built.ok).toBe(true);
+    if (built.ok) expect(built.request.source).toMatchObject({ kind: "video", url: "https://www.youtube.com/watch?v=qH__o17xHls" });
+  });
+
+  it("falls back to the empty form without a (usable) link", () => {
+    expect(formFromSourceUrl(null)).toEqual(EMPTY_FORM);
+    expect(formFromSourceUrl(undefined)).toEqual(EMPTY_FORM);
+    expect(formFromSourceUrl("not a link")).toEqual(EMPTY_FORM);
   });
 });

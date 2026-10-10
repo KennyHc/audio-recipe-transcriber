@@ -1,9 +1,9 @@
 import { useState } from "react";
-import { LogOut, Settings as SettingsIcon, ShieldCheck } from "lucide-react";
+import { LogOut, Settings as SettingsIcon, ShieldCheck, ShoppingBasket } from "lucide-react";
 import type { MeResponse } from "@recipe/shared";
 import { account, type AccountUser } from "@/backend";
 import { initialOf } from "@/lib/useAccount";
-import { adminHref, navigate, settingsHref } from "@/lib/router";
+import { adminHref, navigate, settingsHref, shoppingListHref } from "@/lib/router";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -78,6 +78,9 @@ export function AccountMenu({ user }: { user: AccountUser }) {
           </p>
         </div>
         <DropdownMenuSeparator />
+        <DropdownMenuItem onSelect={() => navigate(shoppingListHref())}>
+          <ShoppingBasket className="h-3.5 w-3.5" /> Shopping list
+        </DropdownMenuItem>
         <DropdownMenuItem onSelect={() => navigate(settingsHref())}>
           <SettingsIcon className="h-3.5 w-3.5" /> Settings
         </DropdownMenuItem>

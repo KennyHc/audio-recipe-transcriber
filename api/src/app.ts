@@ -10,6 +10,7 @@ import {
   ImportRequest,
   PublishRequest,
   PublishSuggestionsRequest,
+  ClientErrorReport,
   ReportRequest,
 } from "@recipe/shared";
 import type { Firestore } from "firebase-admin/firestore";
@@ -37,6 +38,8 @@ import { adminAction, adminQueue, clientIp, createReport, isAdminToken } from ".
 import { publishRecipe, type PublicDeps, unpublishRecipe } from "./publish";
 import { createRecipe, reextractRecipe } from "./recipes";
 import { publishSuggestions } from "./suggestions";
+import { recordClientError } from "./telemetry";
+import { previewPage } from "./preview";
 import { type FetchLike, MAX_SOURCE_URL_CHARS, previewSource } from "./sources";
 import {
   DEFAULT_BODY_LIMIT_BYTES,
@@ -169,6 +172,25 @@ export function createApp(deps: AppDeps): Hono<{ Variables: AuthVariables }> {
   });
 
   // Works signed out: App Check required, ID token optional.
+  // Privacy-safe browser error reports (shared/telemetry.ts): logged, never stored.
+  app.post("/client-errors", appCheck, optionalUser(auth), async (c) => {
+    const body = parseBodyOrThrow(ClientErrorReport, await readJsonBody(c.req.raw, PUBLIC_BODY_LIMIT_BYTES));
+    const ip = clientIp(c.req.header("X-Forwarded-For"));
+    await recordClientError({ db, logger, now: now(), salt: config.reportSalt }, ip, c.get("optionalUser") !== null, body);
+    return c.body(null, 204);
+  });
+
+  // Link previews for /r/{id} on Firebase Hosting (rewritten here). No auth: crawlers.
+  app.get("/r/:id", async (c) => {
+    const html = await previewPage(
+      { db, fetch: publicDeps.fetch, siteOrigin: config.publicSiteOrigin, now },
+      c.req.param("id"),
+    );
+    if (html === null) return c.text("Temporarily unavailable — please reload.", 503);
+    c.header("Cache-Control", "public, max-age=0, s-maxage=60");
+    return c.html(html, 200);
+  });
+
   app.post("/public/:id/report", appCheck, optionalUser(auth), async (c) => {
     const body = parseBodyOrThrow(ReportRequest, await readJsonBody(c.req.raw, PUBLIC_BODY_LIMIT_BYTES));
     const ip = clientIp(c.req.header("X-Forwarded-For"));

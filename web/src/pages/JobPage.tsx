@@ -21,6 +21,7 @@ import { useWakeLock } from "@/lib/processingHealth";
 import { AudioAvailableContext } from "@/lib/audioAvailability";
 import { IS_CLOUD } from "@/lib/mode";
 import { PublishControls } from "@/components/publish/PublishControls";
+import { AddToShoppingListButton } from "@/components/shopping/AddToShoppingListButton";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
@@ -76,6 +77,7 @@ function JobErrorMessage({ error }: { error: string }) {
 
 export function JobPage({ jobId, cookRoute }: { jobId: string; cookRoute: boolean }) {
   const [job, setJob] = useState<Job | null>(null);
+  const [justFinished, setJustFinished] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
 
   const [transcript, setTranscript] = useState<Transcript | null>(null);
@@ -217,6 +219,8 @@ export function JobPage({ jobId, cookRoute }: { jobId: string; cookRoute: boolea
   useEffect(() => {
     let cancelled = false;
     let interval: ReturnType<typeof setInterval> | null = null;
+    let lastStatus: Job["status"] | null = null;
+    setJustFinished(false);
     transcriptFetchedRef.current = false;
     setJob(null);
     setLatest(null);
@@ -249,7 +253,10 @@ export function JobPage({ jobId, cookRoute }: { jobId: string; cookRoute: boolea
         }
         if (j.status === "done") {
           loadRecipe();
+          // Finished while we watched (not opened already done): offer to share it.
+          if (lastStatus !== null && lastStatus !== "done" && lastStatus !== "error") setJustFinished(true);
         }
+        lastStatus = j.status;
         if (TERMINAL_STATUSES.includes(j.status) && interval) {
           clearInterval(interval);
           interval = null;
@@ -589,7 +596,7 @@ export function JobPage({ jobId, cookRoute }: { jobId: string; cookRoute: boolea
                     </p>
                     {IS_CLOUD && !isViewingOld && (
                       <div className="pt-1">
-                        <PublishControls recipeId={jobId} privateVersion={latest?.meta.version ?? null} />
+                        <PublishControls recipeId={jobId} privateVersion={latest?.meta.version ?? null} justFinished={justFinished} />
                       </div>
                     )}
                   </div>
@@ -686,6 +693,15 @@ export function JobPage({ jobId, cookRoute }: { jobId: string; cookRoute: boolea
                   currentTime={currentTime}
                   checkedIngredients={checkedIngredients}
                   onToggleIngredient={toggleIngredient}
+                  ingredientsAction={
+                    <AddToShoppingListButton
+                      recipeId={jobId}
+                      title={displayedRecipe.title}
+                      isPublic={false}
+                      ingredients={displayedRecipe.ingredients}
+                      scaleFactor={scaleFactor}
+                    />
+                  }
                 />
               </TabsContent>
               <TabsContent value="transcript">

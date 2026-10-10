@@ -82,6 +82,12 @@ export const RecipeDoc = z.object({
   updatedAt: z.string(), // ISO; the library is ordered by this (index: ownerId, updatedAt desc)
   currentVersion: z.number().int(), // == latest version number
   latest: Recipe,
+  /**
+   * The video/page the clip came from, entered at upload or later (owner may change it);
+   * prefills the Publish dialog. Private — only the public snapshot's credit is public.
+   * Optional: recipes created before this field existed lack it.
+   */
+  sourceUrl: z.string().max(500).nullable().optional(),
 });
 export type RecipeDoc = z.infer<typeof RecipeDoc>;
 
@@ -134,6 +140,15 @@ export const CreateRecipeRequest = z.object({
   id: z.string().regex(/^[A-Za-z0-9_-]{8,64}$/),
   fileName: z.string().min(1).max(300),
   transcript: Transcript,
+  /** Optional video/page link entered at upload (stored as RecipeDoc.sourceUrl). */
+  sourceUrl: z
+    .string()
+    .url()
+    .max(500)
+    // zod's .url() also accepts javascript:, data:, … — only web links are stored.
+    .regex(/^https?:\/\//i, "must be an http(s) link")
+    .nullable()
+    .optional(),
 });
 export type CreateRecipeRequest = z.infer<typeof CreateRecipeRequest>;
 

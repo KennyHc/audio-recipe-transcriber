@@ -59,16 +59,18 @@ held for review and its creator couldn't see why; it went public tagged Chinese/
 | 1 | Owner sees why a recipe is in review + **Change source** | S | ✅ |
 | 2 | Wrong-link warning in the Publish dialog (Haiku compares video title vs recipe) | S | ✅ |
 | 3 | Suggested tags (same call) | S | ✅ |
-| 4 | Ask for the video link at upload, so publishing is one click | S | |
-| 5 | Link previews on web.app (move the preview function to Cloud Run) | M | |
-| 6 | Creator pages `/@handle` | M | |
-| 7 | Shopping list across saved recipes | M | |
-| 8 | Privacy-safe error reporting | S | |
+| 4 | Ask for the video link at upload, so publishing is one click | S | ✅ |
+| 5 | Link previews on web.app (Hosting rewrites /r/** to the API) | M | ✅ |
+| 6 | Creator pages `/@handle` | M | ✅ |
+| 7 | Shopping list across saved recipes | M | ✅ |
+| 8 | Privacy-safe error reporting | S | ✅ |
 | 9 | Floating mini player on public pages (timestamps don't lose your place) | M | ✅ |
 | 10 | Explore filters as Cuisine / Meal / Diet dropdowns | S | ✅ |
 | 11 | Cards show time + ingredient count; hide zero like/save counts | S | ✅ |
 | 12 | Public pages say "notes from the video" instead of "things to double-check" | S | ✅ |
-| 13 | Nudges to grow the bank ("Publish your first recipe") | S | |
+| 13 | Nudges to grow the bank ("Publish your first recipe") | S | ✅ |
+
+Also: Explore re-composed (heading, search, and grid share one column; sticky toolbar).
 
 Housekeeping: raise the Anthropic Console limit when usage grows; retire the anonymous
 Worker; pick a domain and point it at Firebase Hosting.

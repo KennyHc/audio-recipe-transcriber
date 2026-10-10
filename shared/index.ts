@@ -9,3 +9,5 @@ export * from "./backup";
 export * from "./cloud";
 export * from "./public";
 export * from "./prompts/publishAssist";
+export * from "./shopping";
+export * from "./telemetry";

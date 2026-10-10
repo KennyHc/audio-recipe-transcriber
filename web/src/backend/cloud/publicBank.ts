@@ -8,13 +8,17 @@
 
 import {
   collection,
+  count,
   doc,
+  getAggregateFromServer,
   getDoc,
   getDocs,
   limit,
   orderBy,
   query,
   startAfter,
+  sum,
+  updateDoc,
   where,
   type DocumentSnapshot,
   type Firestore,
@@ -23,6 +27,8 @@ import {
 import { COLLECTIONS, PUBLIC_COLLECTIONS, PublicRecipeDoc, type PublicRecipe } from "@recipe/shared";
 import type { PublicBank, SavedEntry } from "../publicBank";
 import { buildExploreQuery, matchesClientFilter } from "@/lib/explore";
+import { buildCreatorQuery } from "@/lib/creator";
+import { sourceUrlProblem } from "@/lib/sourceUrl";
 import type { ApiClient } from "./api";
 import { friendlyFirestoreMessage } from "./errors";
 
@@ -99,6 +105,79 @@ export function createPublicBank({ firestore: db, api, currentUid }: PublicBankD
         cursor: snap.docs.length === spec.limit && last ? last : null,
         sortedByNewestForSearch: spec.sortedByNewestForSearch,
       };
+    },
+
+    async recentPublic(n) {
+      const spec = buildExploreQuery({ tab: "newest", search: "", tag: null });
+      const snap = await getDocs(
+        query(
+          collection(db, PUBLIC_COLLECTIONS.publicRecipes),
+          ...spec.filters.map((f) => where(f.field, f.op, f.value)),
+          orderBy(spec.orderBy.field, spec.orderBy.direction),
+          limit(Math.max(1, Math.min(n, spec.limit))),
+        ),
+      );
+      return snap.docs.flatMap((d) => parsePublicRecipe(d.id, d.data()) ?? []);
+    },
+
+    async listByCreator(handle, cursor) {
+      const spec = buildCreatorQuery(handle);
+      const constraints: QueryConstraint[] = spec.filters.map((f) => where(f.field, f.op, f.value));
+      constraints.push(orderBy(spec.orderBy.field, spec.orderBy.direction));
+      if (cursor) constraints.push(startAfter(cursor as DocumentSnapshot));
+      constraints.push(limit(spec.limit));
+      let snap;
+      try {
+        snap = await getDocs(query(collection(db, PUBLIC_COLLECTIONS.publicRecipes), ...constraints));
+      } catch (err) {
+        // eslint-disable-next-line no-console
+        console.error("Creator query failed", err);
+        throw new Error(
+          errorCode(err) === "unavailable" ? "You're offline — reconnect to browse recipes." : "Couldn't load recipes. Please try again.",
+        );
+      }
+      const items: PublicRecipe[] = [];
+      for (const d of snap.docs) {
+        const r = parsePublicRecipe(d.id, d.data());
+        if (r) items.push(r);
+      }
+      const last = snap.docs[snap.docs.length - 1];
+      return { items, cursor: snap.docs.length === spec.limit && last ? last : null };
+    },
+
+    async creatorTotals(handle) {
+      // Same filters as the list (the rules check aggregations like queries); no ordering needed.
+      const spec = buildCreatorQuery(handle);
+      try {
+        const snap = await getAggregateFromServer(
+          query(collection(db, PUBLIC_COLLECTIONS.publicRecipes), ...spec.filters.map((f) => where(f.field, f.op, f.value))),
+          { recipes: count(), likes: sum("stats.likes"), saves: sum("stats.saves") },
+        );
+        const d = snap.data();
+        return { recipes: d.recipes, likes: d.likes ?? 0, saves: d.saves ?? 0 };
+      } catch (err) {
+        // eslint-disable-next-line no-console
+        console.warn("Creator totals unavailable", err);
+        return null;
+      }
+    },
+
+    async getSourceUrl(recipeId) {
+      const snap = await getDoc(doc(db, COLLECTIONS.recipes, recipeId));
+      const v = snap.exists() ? (snap.data() as { sourceUrl?: unknown }).sourceUrl : null;
+      return typeof v === "string" && v ? v : null;
+    },
+
+    async setSourceUrl(recipeId, sourceUrl) {
+      if (sourceUrl !== null) {
+        const problem = sourceUrlProblem(sourceUrl);
+        if (problem) throw new Error(problem);
+      }
+      try {
+        await updateDoc(doc(db, COLLECTIONS.recipes, recipeId), { sourceUrl });
+      } catch (err) {
+        throw new Error(friendlyFirestoreMessage(err));
+      }
     },
 
     async listOwnPublished() {

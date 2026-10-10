@@ -37,6 +37,17 @@ service cloud.firestore {
       allow read: if signedIn() && request.auth.uid == uid;
       allow write: if false; // API only (usage, plan, handle)
 
+      // A user's own shopping list (contract: shared/shopping.ts), written by the browser.
+      match /lists/{listId} {
+        allow read, delete: if signedIn() && request.auth.uid == uid;
+        allow create, update: if signedIn() && request.auth.uid == uid
+          && listId == 'shopping'
+          && request.resource.data.keys().hasOnly(['items', 'updatedAt'])
+          && request.resource.data.items is list
+          && request.resource.data.items.size() <= 300
+          && request.resource.data.updatedAt is string;
+      }
+
       // Phase 2: a user's own likes and saves (API writes them, so counts stay true).
       match /{kind}/{publicId} {
         allow read: if signedIn() && request.auth.uid == uid && kind in ['likes', 'saves'];
@@ -56,7 +67,16 @@ service cloud.firestore {
       allow delete: if signedIn() && resource.data.ownerId == request.auth.uid
         && !exists(/databases/$(database)/documents/publicRecipes/$(recipeId));
 
-      // Only as part of saving a new client version (see versions/{v} below).
+      // The owner may change the recipe's video/page link on its own (prefills Publish).
+      allow update: if signedIn()
+        && resource.data.ownerId == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['sourceUrl'])
+        && (request.resource.data.sourceUrl == null
+            || (request.resource.data.sourceUrl is string
+                && request.resource.data.sourceUrl.size() <= 500
+                && request.resource.data.sourceUrl.matches('https?://.+')));
+
+      // Otherwise only as part of saving a new client version (see versions/{v} below).
       allow update: if signedIn()
         && resource.data.ownerId == request.auth.uid
         && request.resource.data.diff(resource.data).affectedKeys()

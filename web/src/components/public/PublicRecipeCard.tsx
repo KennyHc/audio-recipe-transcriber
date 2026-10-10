@@ -2,7 +2,7 @@ import { useState, type ReactNode } from "react";
 import { Bookmark, Clock, Heart } from "lucide-react";
 import type { PublicRecipe } from "@recipe/shared";
 import { NoodlesLogo } from "@/components/NoodlesLogo";
-import { publicHref } from "@/lib/router";
+import { creatorHref, publicHref } from "@/lib/router";
 import { formatDuration } from "@/lib/format";
 
 /** "Recipe by {channel}" for credited sources, else "by @handle". */
@@ -54,18 +54,47 @@ export function RecipeThumbnail({ src, className = "" }: { src: string | null; c
   );
 }
 
+/** "Recipe by Chef Wang · @ann" / "by @ann" — the @handle links to the creator page. */
+function CardCredit({ pub }: { pub: Pick<PublicRecipe, "source" | "handle"> }) {
+  const handleLink = (
+    <a
+      href={creatorHref(pub.handle)}
+      className="relative z-10 rounded-[4px] underline-offset-4 hover:text-[hsl(var(--accent-text))] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--ring))]"
+    >
+      @{pub.handle}
+    </a>
+  );
+  const channel = pub.source.kind !== "own" ? pub.source.channelName : null;
+  return (
+    <p className="truncate text-sm text-[hsl(var(--ink-muted))]">
+      {channel ? (
+        <>
+          Recipe by {channel}
+          <span className="text-[hsl(var(--ink-faint))]"> · {handleLink}</span>
+        </>
+      ) : (
+        <>by {handleLink}</>
+      )}
+    </p>
+  );
+}
+
 export function PublicRecipeCard({ pub, footer }: { pub: PublicRecipe; footer?: ReactNode }) {
   const facts = cardFacts(pub.recipe);
   const showCounts = showEngagementCounts(pub.stats);
+  // The title's link stretches over the whole card (::after), so the @handle can be its own link.
   return (
-    <div className="group relative h-full overflow-hidden rounded-[10px] border border-[hsl(var(--border))] bg-[hsl(var(--surface))] transition-all duration-150 hover:-translate-y-0.5 hover:border-[hsl(var(--border-strong))] hover:shadow-[var(--shadow-float)]">
-      <a href={publicHref(pub.id)} className="flex h-full flex-col">
+    <div className="group relative h-full overflow-hidden rounded-[10px] border border-[hsl(var(--border))] bg-[hsl(var(--surface))] transition-all duration-150 focus-within:border-[hsl(var(--border-strong))] hover:-translate-y-0.5 hover:border-[hsl(var(--border-strong))] hover:shadow-[var(--shadow-float)]">
+      <div className="flex h-full flex-col">
         <RecipeThumbnail src={pub.source.thumbnailUrl} />
         <div className="flex flex-1 flex-col gap-1.5 p-4">
-          <p className="font-serif text-xl leading-tight text-[hsl(var(--ink))] transition-colors group-hover:text-[hsl(var(--accent-text))] line-clamp-2">
+          <a
+            href={publicHref(pub.id)}
+            className="font-serif text-xl leading-tight text-[hsl(var(--ink))] transition-colors group-hover:text-[hsl(var(--accent-text))] line-clamp-2 after:absolute after:inset-0 after:content-[''] focus-visible:outline-none focus-visible:after:rounded-[10px] focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-[hsl(var(--ring))]"
+          >
             {pub.recipe.title}
-          </p>
-          <p className="truncate text-sm text-[hsl(var(--ink-muted))]">{creditLine(pub)}</p>
+          </a>
+          <CardCredit pub={pub} />
           {(facts.length > 0 || showCounts) && (
             <div className="mt-auto flex flex-wrap items-center gap-x-3 gap-y-1 pt-1 text-xs tabular-nums text-[hsl(var(--ink-faint))]">
               {facts.length > 0 && (
@@ -89,8 +118,8 @@ export function PublicRecipeCard({ pub, footer }: { pub: PublicRecipe; footer?: 
             </div>
           )}
         </div>
-      </a>
-      {footer}
+      </div>
+      {footer && <div className="relative z-10">{footer}</div>}
     </div>
   );
 }

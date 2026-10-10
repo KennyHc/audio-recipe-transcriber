@@ -11,6 +11,8 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { exploreHref, jobHref, privacyHref, settingsHref } from "@/lib/router";
 import { PublicStatusPill } from "@/components/publish/PublicStatusPill";
 import { PublicRecipeCard } from "@/components/public/PublicRecipeCard";
+import { QuickPublishDialog } from "@/components/publish/QuickPublishDialog";
+import { dismissShareFirst, isShareFirstDismissed, shareFirstTarget } from "@/lib/nudges";
 import { routeIfNeedsSetup } from "@/lib/needsSetup";
 import { Button } from "@/components/ui/button";
 import {
@@ -30,7 +32,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { NoodlesLogo } from "@/components/NoodlesLogo";
 import { formatFriendlyDate } from "@/lib/format";
-import { MoreHorizontal, Trash2, KeyRound, UploadCloud, Laptop, ListChecks, BookmarkX } from "lucide-react";
+import { MoreHorizontal, Trash2, KeyRound, UploadCloud, Laptop, ListChecks, BookmarkX, Globe, X } from "lucide-react";
 
 /** "3 hours" / "1 hour" — same rounding as proxyClaude.ts's describeProxyError. */
 function formatResetHours(seconds: number): string {
@@ -46,6 +48,9 @@ export function Library() {
   const [quota, setQuota] = useState<QuotaResponse | null>(null);
   // Cloud mode: which of my recipes are published, and the public recipes I saved.
   const [published, setPublished] = useState<Map<string, PublicRecipe>>(new Map());
+  const [publishedLoaded, setPublishedLoaded] = useState(false);
+  const [shareFirstDismissed, setShareFirstDismissed] = useState(isShareFirstDismissed);
+  const [quickPublishId, setQuickPublishId] = useState<string | null>(null);
   const [saved, setSaved] = useState<SavedEntry[] | null>(null);
   const [removingSave, setRemovingSave] = useState<string | null>(null);
 
@@ -80,7 +85,10 @@ export function Library() {
     if (!publicBank) return;
     publicBank
       .listOwnPublished()
-      .then(setPublished)
+      .then((map) => {
+        setPublished(map);
+        setPublishedLoaded(true);
+      })
       .catch(() => undefined);
     publicBank
       .listSaved()
@@ -166,6 +174,12 @@ export function Library() {
     }
   }
 
+  const shareFirstId = IS_CLOUD
+    ? shareFirstTarget({ jobs, publishedCount: published.size, publishedLoaded, dismissed: shareFirstDismissed })
+    : null;
+  const shareFirstJob = shareFirstId ? jobs?.find((j) => j.id === shareFirstId) : undefined;
+  const shareFirstTitle = shareFirstJob?.title ?? shareFirstJob?.fileName ?? "your latest recipe";
+
   const howItWorks = [
     { icon: UploadCloud, text: "Drop a clip", short: "Drop a clip" },
     {
@@ -215,6 +229,7 @@ export function Library() {
             ) : (
               <>
                 <UploadZone
+                  askSourceUrl={IS_CLOUD}
                   onUploaded={() => {
                     refresh();
                     refreshQuota();
@@ -270,6 +285,48 @@ export function Library() {
       )}
 
       {IS_CLOUD && user && <MoveLocalRecipesPrompt user={user} onMoved={refresh} />}
+
+      {IS_CLOUD && shareFirstId && (
+        <div className="relative flex flex-col gap-3 rounded-[10px] border border-[hsl(var(--accent-tint-strong))] bg-[hsl(var(--accent-tint))] p-4 pr-12 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-start gap-3">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[8px] bg-[hsl(var(--surface))] text-[hsl(var(--accent-text))]">
+              <Globe className="h-4 w-4" />
+            </span>
+            <div className="space-y-0.5">
+              <p className="font-medium text-[hsl(var(--ink))]">Share your first recipe in the bank</p>
+              <p className="text-sm text-[hsl(var(--ink-muted))]">
+                The original cook gets the credit, and a quick check runs before it goes public.
+              </p>
+            </div>
+          </div>
+          <Button
+            size="sm"
+            className="max-w-full self-start sm:self-center"
+            onClick={() => setQuickPublishId(shareFirstId)}
+          >
+            <span className="truncate">Publish “{shareFirstTitle}”…</span>
+          </Button>
+          <button
+            type="button"
+            aria-label="Dismiss"
+            onClick={() => {
+              dismissShareFirst();
+              setShareFirstDismissed(true);
+            }}
+            className="absolute right-2 top-2 inline-flex h-8 w-8 items-center justify-center rounded-[6px] text-[hsl(var(--ink-faint))] transition-colors hover:bg-[hsl(var(--accent-tint-strong))] hover:text-[hsl(var(--ink))]"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
+      <QuickPublishDialog
+        recipeId={quickPublishId}
+        onClose={() => setQuickPublishId(null)}
+        onPublished={(pub) => {
+          setPublished((prev) => new Map(prev).set(pub.id, pub));
+          setQuickPublishId(null);
+        }}
+      />
 
       <div className="space-y-3">
         <h2 className="text-[12px] font-medium uppercase tracking-[0.08em] text-[hsl(var(--ink-muted))]">

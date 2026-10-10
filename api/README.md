@@ -9,7 +9,7 @@ and `shared/public.ts` (Phase 2: publishing + the public recipe bank). Plans: `P
 | Route | |
 |---|---|
 | `GET /health` | no auth |
-| `POST /recipes` | extract + verify + save v1; idempotent on `id`; counts 1 |
+| `POST /recipes` | extract + verify + save v1 (+ optional `sourceUrl`, http(s) only); idempotent on `id`; counts 1 |
 | `POST /recipes/:id/reextract` | new `reextracted` version from the saved transcript; counts 1 |
 | `POST /import` | bulk import of a local library; no Claude, no quota |
 | `GET /me` | plan + usage; creates `users/{uid}` |
@@ -21,10 +21,13 @@ Phase 2 (`shared/public.ts`; all need App Check):
 |---|---|---|
 | `GET /sources/preview?url=` | signed in | platform/videoId/canonical URL + oEmbed credit; `existingPublicId` if a live public page exists |
 | `POST /recipes/:id/publish` | owner | first publish or "Update public version"; handle reserved on first publish; oEmbed credit; duplicate-video check (409); Haiku screening (global budget, fails safe to `review`); 20/day |
+| `POST /recipes/:id/publish/suggestions` | owner | suggested tags + wrong-link warning for the Publish dialog (one Haiku call, global budget); fails soft to empty; 60/day |
 | `DELETE /recipes/:id/publish` | owner or admin | deletes the snapshot + its `sources` mapping; idempotent (204) |
 | `POST`/`DELETE /public/:id/like`, `…/save` | signed in | idempotent; stats + score in one transaction; POST needs a live recipe, DELETE also clears a dangling one; 300 changes/day |
 | `POST /public/:id/copy` | signed in | private copy (v1 `edited`, note "Copied from @handle's recipe"); no Claude, no quota; counts toward the 300/day |
 | `POST /public/:id/report` | ID token optional | report/claim (claims need `contact`); 10/day per user and per hashed IP; 202 |
+| `POST /client-errors` | ID token optional | privacy-safe browser error report (shared/telemetry.ts): re-sanitized, logged as `{"event":"client_error"}`, never stored; 50/day per hashed IP; 204 |
+| `GET /r/:id` | none (crawlers) | link previews on Firebase Hosting (`/r/**` rewritten here): the site's index.html with Open Graph tags for a live recipe, else unchanged |
 | `GET /admin/queue`, `POST /admin/public/:id` | `admin` claim | open reports newest first + their recipe; `hide` / `restore` / `dismiss` |
 
 **Outgoing requests (SSRF):** only `https://www.youtube.com/oembed`, `https://www.tiktok.com/oembed`,
@@ -53,7 +56,8 @@ project `recipe-transcriber-eu`; `--remove` to revoke). Sign out/in afterwards.
 | `REPORT_SALT` | — (required in production) | Salt for hashing reporter IPs. Secret Manager `report-salt` (created by deploy-api.sh). A fixed dev value is used against the emulators. Never logged. |
 | `DAILY_BUDGET_USD` | `2` | Global Claude spend per UTC day (`system/budget-YYYY-MM-DD`) |
 | `FREE_MONTHLY_RECIPES` | `30` | Per user per UTC month, incl. re-extracts |
-| `ALLOWED_ORIGINS` | `https://recipe-transcriber.pages.dev` | Comma list. With emulators, `http://localhost:5180`–`5184` are added. |
+| `ALLOWED_ORIGINS` | pages.dev, web.app, firebaseapp.com sites | Comma list. With emulators, `http://localhost:5180`–`5184` are added. |
+| `PUBLIC_SITE_ORIGIN` | `https://recipe-transcriber-eu.web.app` | Where `GET /r/:id` fetches index.html, and the origin in `og:url` |
 | `REQUIRE_APP_CHECK` | `true` | `false` only allowed when `FIRESTORE_EMULATOR_HOST` is set |
 | `PORT` | `8080` | |
 

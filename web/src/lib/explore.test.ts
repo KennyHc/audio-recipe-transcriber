@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { EXPLORE_PAGE_SIZE } from "@recipe/shared";
-import { REQUIRED_FILTERS, buildExploreQuery, matchesClientFilter } from "./explore";
+import { REQUIRED_FILTERS, buildExploreQuery, exploreEmptyMessage, matchesClientFilter, tagFilterButtonLabel } from "./explore";
 
 describe("buildExploreQuery", () => {
   it("always filters live + public (required by firestore.rules)", () => {
@@ -77,5 +77,23 @@ describe("tagGroupOf (Explore filter dropdowns)", () => {
     expect(tagGroupOf(null)).toBeNull();
     expect(tagGroupOf("nope")).toBeNull();
     for (const g of TAG_GROUPS) for (const t of TAGS[g]) expect(tagGroupOf(t)).toBe(g);
+  });
+});
+
+describe("Explore toolbar", () => {
+  const labels = { group: (g: string) => g.toUpperCase(), tag: (t: string) => `#${t}` };
+
+  it("a filter button shows the picked tag when it's in its group, else the group name", () => {
+    expect(tagFilterButtonLabel("cuisine", null, labels)).toEqual({ text: "CUISINE", active: false });
+    expect(tagFilterButtonLabel("cuisine", "chinese", labels)).toEqual({ text: "#chinese", active: true });
+    expect(tagFilterButtonLabel("diet", "chinese", labels)).toEqual({ text: "DIET", active: false });
+    expect(tagFilterButtonLabel("meal", "not-a-tag", labels)).toEqual({ text: "MEAL", active: false });
+  });
+
+  it("empty-state copy depends on whether anything is filtered", () => {
+    expect(exploreEmptyMessage({ tab: "newest", search: "", tag: null }).title).toBe("No public recipes yet");
+    expect(exploreEmptyMessage({ tab: "popular", search: "  ", tag: null }).title).toBe("No public recipes yet");
+    expect(exploreEmptyMessage({ tab: "newest", search: "tofu", tag: null }).title).toBe("No recipes match");
+    expect(exploreEmptyMessage({ tab: "newest", search: "", tag: "vegan" }).title).toBe("No recipes match");
   });
 });
