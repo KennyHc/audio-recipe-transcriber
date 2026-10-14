@@ -7,6 +7,7 @@ import { SignInPanel } from "@/components/account/SignInPanel";
 import { exploreHref, privacyHref } from "@/lib/router";
 import { Button } from "@/components/ui/button";
 import { consumeAccountDeleted } from "@/lib/accountPrefs";
+import { useExampleRecipeHref } from "@/lib/useExampleRecipe";
 
 const HOW_IT_WORKS = [
   { icon: UploadCloud, text: "Drop a clip", short: "Drop a clip" },
@@ -36,6 +37,7 @@ const FEATURES = [
 export function SignedOutLanding() {
   const [deleted] = useState(() => consumeAccountDeleted());
   const [recent, setRecent] = useState<PublicRecipe[]>([]);
+  const exampleHref = useExampleRecipeHref();
 
   useEffect(() => {
     let cancelled = false;
@@ -80,7 +82,16 @@ export function SignedOutLanding() {
                   <Compass className="h-4 w-4" /> Browse recipes
                 </a>
               </Button>
-              <span className="text-sm text-[hsl(var(--ink-muted))]">No account needed to cook.</span>
+              {exampleHref ? (
+                <a
+                  href={exampleHref}
+                  className="inline-flex items-center gap-1 text-sm font-medium text-[hsl(var(--accent-text))] underline-offset-4 hover:underline"
+                >
+                  See an example recipe <ArrowRight className="h-3.5 w-3.5" />
+                </a>
+              ) : (
+                <span className="text-sm text-[hsl(var(--ink-muted))]">No account needed to cook.</span>
+              )}
             </div>
             <p className="text-xs text-[hsl(var(--ink-faint))]">
               Audio stays on your device.{" "}

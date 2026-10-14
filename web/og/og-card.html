@@ -1,0 +1,46 @@
+<!doctype html>
+<!-- Source for web/public/og-image.png (the homepage's link-preview card, 1200x630).
+     Re-render: "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --headless
+       --screenshot=../public/og-image.png --window-size=1200,630 --hide-scrollbars og-card.html -->
+<html><head><meta charset="utf-8" />
+<style>
+@font-face { font-family: Instrument; src: url(../../node_modules/@fontsource/instrument-serif/files/instrument-serif-latin-400-normal.woff2); }
+@font-face { font-family: Geist; src: url(../../node_modules/@fontsource-variable/geist/files/geist-latin-wght-normal.woff2); font-weight: 100 900; }
+html, body { margin: 0; width: 1200px; height: 630px; overflow: hidden; }
+body {
+  font-family: Geist, system-ui, sans-serif; color: hsl(216 50% 12%);
+  background: radial-gradient(900px 500px at 85% -10%, hsl(208 81% 90%), transparent 60%),
+              radial-gradient(700px 500px at -10% 110%, hsl(209 84% 95%), transparent 60%), hsl(210 40% 98%);
+  display: grid; grid-template-columns: 1fr 470px; gap: 56px; padding: 72px 76px; box-sizing: border-box;
+}
+.brand { display: flex; align-items: center; gap: 14px; font-weight: 600; font-size: 24px; }
+.brand svg { width: 44px; height: 44px; color: hsl(207 74% 46%); }
+h1 { font-family: Instrument, Georgia, serif; font-weight: 400; font-size: 76px; line-height: 1.02; letter-spacing: -0.5px; margin: 44px 0 22px; }
+h1 em { font-style: italic; color: hsl(207 74% 46%); padding-right: 0.12em; }
+p { font-size: 25px; line-height: 1.45; color: hsl(214 17% 38%); margin: 0; max-width: 560px; }
+.url { position: absolute; left: 76px; bottom: 56px; font-size: 21px; color: hsl(207 74% 40%); font-weight: 500; }
+.card { align-self: center; background: white; border: 1px solid hsl(214 32% 91%); border-radius: 22px; padding: 30px 32px;
+  box-shadow: 0 30px 60px -20px hsl(213 50% 40% / .25); }
+.card h2 { font-family: Instrument, Georgia, serif; font-weight: 400; font-size: 36px; margin: 0 0 6px; }
+.by { font-size: 17px; color: hsl(214 17% 43%); margin-bottom: 20px; } .by b { color: hsl(216 50% 12%); font-weight: 600; }
+.row { display: flex; justify-content: space-between; align-items: center; padding: 11px 0; border-top: 1px solid hsl(214 32% 93%); font-size: 19px; }
+.row b { font-weight: 650; } .ts { font-size: 15px; color: hsl(207 74% 46%); background: hsl(209 84% 95%); border-radius: 999px; padding: 4px 10px; font-variant-numeric: tabular-nums; }
+.warn { margin-top: 14px; font-size: 15px; color: hsl(207 74% 36%); background: hsl(209 84% 95%); border-radius: 10px; padding: 10px 12px; }
+</style></head>
+<body>
+  <div>
+    <div class="brand"><svg viewBox="0 0 363.674 363.674" fill="currentColor"><path d="M79.496,292.615c-16.686-10.313-28.229-27.017-33.383-48.308c-0.975-4.025-5.027-6.502-9.054-5.524 c-4.026,0.975-6.499,5.027-5.524,9.054c6.102,25.21,19.959,45.105,40.074,57.538c1.229,0.759,2.59,1.121,3.936,1.121 c2.514,0,4.969-1.263,6.387-3.558C84.109,299.415,83.02,294.793,79.496,292.615z" /> <path d="M363.465,70.469c-0.967-4.027-5.016-6.5-9.045-5.542l-179.247,43.032V85.908l163.056-69.827 c3.807-1.631,5.572-6.039,3.941-9.847c-1.631-3.809-6.039-5.574-9.848-3.942L174.755,69.768c-1.017-2.937-3.8-5.049-7.082-5.049 c-4.142,0-7.5,3.357-7.5,7.5v3.794l-4.55,1.948c-0.631-3.505-3.689-6.166-7.375-6.166c-4.143,0-7.5,3.357-7.5,7.5v5.036 l-4.543,1.945c-0.611-3.527-3.68-6.213-7.382-6.213c-4.142,0-7.5,3.357-7.5,7.5v5.086l-4.497,1.926 c-0.482-3.677-3.621-6.517-7.428-6.517c-4.143,0-7.5,3.357-7.5,7.5v5.409l-4.631,1.983c-0.779-3.313-3.745-5.78-7.295-5.78 c-4.142,0-7.5,3.357-7.5,7.5v4.615l-20.778,8.898c-3.808,1.631-5.572,6.039-3.942,9.847c1.219,2.846,3.988,4.55,6.898,4.55 c0.984,0,1.986-0.195,2.949-0.607l14.873-6.369v4.608l-14.318,3.438c-4.027,0.967-6.509,5.016-5.542,9.044 c0.825,3.439,3.899,5.751,7.286,5.751c0.58,0,1.17-0.068,1.758-0.209l10.816-2.597v64.284H7.5c-4.142,0-7.5,3.357-7.5,7.5 c0,28.225,6.892,54.242,19.93,75.239c12.92,20.807,31.711,36.318,54.55,45.096v16.73c0,4.143,3.358,7.5,7.5,7.5h97.493 c4.143,0,7.5-3.357,7.5-7.5v-16.73c22.838-8.777,41.631-24.29,54.549-45.096c13.039-20.997,19.932-47.015,19.932-75.239 c0-4.143-3.358-7.5-7.5-7.5H116.898v-72.549l4.719-1.133c0.898,3.138,3.781,5.436,7.206,5.436c4.142,0,7.5-3.357,7.5-7.5v-1.466 l4.471-1.074c0.405,3.76,3.587,6.688,7.454,6.688c4.143,0,7.5-3.357,7.5-7.5v-2.777l4.425-1.063v14.33c0,4.143,3.358,7.5,7.5,7.5 s7.5-3.357,7.5-7.5v-17.931l182.749-43.873C361.949,78.546,364.432,74.497,363.465,70.469z M97.473,119.181l4.426-1.895v8.264 l-4.426,1.063V119.181z M89.479,346.99v-7.19h82.493v7.19H89.479z M178.76,324.8H82.693 c-40.367-14.153-65.217-51.11-67.519-99.875h231.103C243.975,273.689,219.127,310.646,178.76,324.8z M101.898,209.925h-4.426 v-67.886l4.426-1.063V209.925z M116.898,110.863l4.425-1.895v11.918l-4.425,1.063V110.863z M136.323,102.545l4.425-1.896v15.574 l-4.425,1.063V102.545z M155.748,112.623V94.226l4.425-1.896v19.229L155.748,112.623z" /> </svg>Recipe Transcriber</div>
+    <h1>Cooking videos into <em>recipes</em> you can trust</h1>
+    <p>Every ingredient linked to the moment it's said. Transcribed on your device. Credit to the creator.</p>
+  </div>
+  <div class="card">
+    <h2>Egg Fried Rice</h2>
+    <div class="by">Recipe by <b>Seonkyoung Longest</b></div>
+    <div class="row"><span><b>4</b> eggs</span><span class="ts">▶ 0:12</span></div>
+    <div class="row"><span><b>2 cups</b> cold rice</span><span class="ts">▶ 0:41</span></div>
+    <div class="row"><span><b>4</b> green onions, chopped</span><span class="ts">▶ 0:55</span></div>
+    <div class="row"><span><b>1 tbsp</b> soy sauce</span><span class="ts">▶ 1:20</span></div>
+    <div class="warn">⚠ Salt: "a little pinch" — about ¼ tsp</div>
+  </div>
+  <div class="url">recipe-transcriber-eu.web.app</div>
+</body></html>

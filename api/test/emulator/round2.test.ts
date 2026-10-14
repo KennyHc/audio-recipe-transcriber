@@ -55,6 +55,11 @@ describe.skipIf(!EMULATOR)("GET /r/:id (link previews on Firebase Hosting)", () 
     expect(html).toContain('content="Recipe by Chef Kim · ');
     expect(html).toContain('<meta property="og:url" content="https://site.example/r/recipe-live-01" />');
     expect(html).not.toContain("<Noodles>");
+    // The homepage's own preview tags are replaced, not duplicated (crawlers take the first).
+    expect(html.match(/property="og:title"/g)).toHaveLength(1);
+    expect(html.match(/property="og:image"/g)).toHaveLength(1);
+    expect(html).not.toContain("Homepage");
+    expect(html).toContain('<meta charset="UTF-8" />');
   });
 
   it("serves the page unchanged for review, missing, or implausible ids", async () => {

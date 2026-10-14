@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { useExampleRecipeHref } from "@/lib/useExampleRecipe";
 import { UploadCloud, Loader2, Link2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { backend } from "@/backend";
@@ -32,6 +33,7 @@ export function UploadZone({
   const [progress, setProgress] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [linkText, setLinkText] = useState("");
+  const exampleHref = useExampleRecipeHref(); // cloud mode only; null elsewhere
   const [linkTouched, setLinkTouched] = useState(false);
   const link = askSourceUrl ? parseSourceUrl(linkText) : ({ ok: true, url: null } as const);
   const linkError = !link.ok && (linkTouched || linkText.length > 12) ? link.error : null;
@@ -193,6 +195,14 @@ export function UploadZone({
       {error && (
         <p role="alert" className="text-sm text-[hsl(var(--danger))]">
           {error}
+        </p>
+      )}
+      {exampleHref && progress === null && (
+        <p className="text-xs text-[hsl(var(--ink-faint))]">
+          No clip handy?{" "}
+          <a href={exampleHref} className="font-medium text-[hsl(var(--accent-text))] underline-offset-4 hover:underline">
+            See an example recipe
+          </a>
         </p>
       )}
     </div>

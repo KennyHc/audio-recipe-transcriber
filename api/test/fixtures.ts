@@ -88,7 +88,10 @@ export const SCREEN_USAGE: ClaudeUsage = { inputTokens: 600, outputTokens: 20, c
  * that would hit some other host fails loudly.
  */
 export const SITE_INDEX_HTML =
-  '<!doctype html><html><head><meta charset="UTF-8" /><title>Recipe Transcriber</title></head><body><div id="root"></div></body></html>';
+  '<!doctype html><html><head><meta charset="UTF-8" /><title>Recipe Transcriber</title>' +
+  '<meta name="description" content="Homepage" /><meta property="og:title" content="Homepage" />' +
+  '<meta property="og:image" content="https://site.example/og-image.png" /><meta name="twitter:card" content="summary_large_image" />' +
+  '</head><body><div id="root"></div></body></html>';
 
 export class FakeFetch {
   calls: string[] = [];

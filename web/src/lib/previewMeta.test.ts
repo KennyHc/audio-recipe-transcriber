@@ -5,6 +5,7 @@ import {
   escapeHtml,
   firestoreDocUrl,
   fromFirestoreValue,
+  injectPreviewIntoHtml,
   isPlausibleId,
   previewDescription,
   previewFromFirestoreDoc,
@@ -123,5 +124,22 @@ describe("buildPreviewMeta + renderMetaTags", () => {
 
   it("canonical URL drops query and hash", () => {
     expect(canonicalPageUrl("https://x.dev/r/r1?utm=1#/", "r1")).toBe("https://x.dev/r/r1");
+  });
+});
+
+describe("injectPreviewIntoHtml", () => {
+  it("replaces the homepage's preview tags instead of duplicating them", () => {
+    const home =
+      '<html><head><meta charset="utf-8" /><title>Home</title><meta name="description" content="Home" />' +
+      '<meta property="og:title" content="Home" /><meta property="og:image" content="https://x.example/og.png" />' +
+      '<meta name="twitter:card" content="summary_large_image" /><meta name="viewport" content="width=device-width" /></head><body></body></html>';
+    const info = { title: "Soup", description: null, channelName: "Chef", handle: "chef", thumbnailUrl: null, ingredientCount: 3, visibility: "public" as const };
+    const html = injectPreviewIntoHtml(home, buildPreviewMeta(info, "https://site.example/r/abc12345"));
+    expect(html.match(/og:title/g)).toHaveLength(1);
+    expect(html).toContain('content="Soup"');
+    expect(html).not.toContain('content="Home"');
+    expect(html).not.toContain("x.example/og.png");
+    expect(html).toContain('name="viewport"'); // unrelated meta tags stay
+    expect(html).toContain("<title>Soup · Recipe Transcriber</title>");
   });
 });

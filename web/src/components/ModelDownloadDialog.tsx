@@ -10,6 +10,7 @@ import {
   DialogClose,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { readDeviceFacts, recommendSpeechModel } from "@/lib/deviceProfile";
 import { SPEECH_MODEL_CATALOG, speechModelKey, type SpeechModelOption } from "@/backend/browser/modelCatalog";
 import { remainingBytesToDownload } from "@/backend/browser/modelDownloader";
 import { formatMB } from "@/lib/downloadProgress";
@@ -41,6 +42,8 @@ export function ModelDownloadDialog({ open, onOpenChange, defaultOption, onDownl
   );
 
   const wifiRecommended = shouldRecommendWifi(readNetworkConnectionInfo());
+  // Why the smaller model is pre-selected on this device (phone, Data Saver, low memory, no GPU).
+  const deviceReason = recommendSpeechModel(readDeviceFacts()).reason;
   const selected = SPEECH_MODEL_CATALOG.find((o) => speechModelKey(o.repoId, o.dtype) === selectedKey) ?? SPEECH_MODEL_CATALOG[0]!;
 
   // If a previous download was interrupted partway through, some of this model's files may
@@ -87,6 +90,10 @@ export function ModelDownloadDialog({ open, onOpenChange, defaultOption, onDownl
             first. It's stored in this browser — later clips start immediately, no waiting.
           </DialogDescription>
         </DialogHeader>
+
+        {deviceReason && selected.repoId.endsWith("whisper-small") && (
+          <p className="text-xs text-[hsl(var(--ink-muted))]">{deviceReason} You can switch below.</p>
+        )}
 
         <div role="radiogroup" aria-label="Speech model" className="space-y-2">
           {SPEECH_MODEL_CATALOG.map((o) => {

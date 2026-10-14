@@ -14,7 +14,7 @@ The anonymous Cloudflare Worker below still runs, so switching back is one `npm 
 | API | Cloud Run `api`, europe-west1 — https://api-391833097082.europe-west1.run.app |
 | Anthropic key | Secret Manager `anthropic-api-key` (only the `api-runner` service account can read it) |
 | Bot check | App Check, reCAPTCHA Enterprise |
-| Limits | 30 recipes/account/month, $2/day Claude budget (env vars in `scripts/deploy-api.sh`) |
+| Limits | 30 recipes/account/month, $5/day Claude budget (env vars in `scripts/deploy-api.sh`; raised from $2 for launch) — keep the Anthropic Console monthly limit above what you expect to spend |
 
 One-time setup: `bash scripts/gcp-setup.sh recipe-transcriber-eu` (done). Then, after changes:
 

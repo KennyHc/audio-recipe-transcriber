@@ -11,20 +11,37 @@
 
 import { DEFAULT_BROWSER_SETTINGS, type BrowserSettings } from "../types";
 import { SETTINGS_STORAGE_KEY } from "../constants";
+import { readDeviceFacts, recommendSpeechModel } from "@/lib/deviceProfile";
+import { SPEECH_MODEL_CATALOG } from "./modelCatalog";
 
 type Listener = (settings: BrowserSettings) => void;
 
 const listeners = new Set<Listener>();
 let cached: BrowserSettings = readFromStorage();
 
+/** The defaults, with the speech model pre-selected for this device (lib/deviceProfile.ts). */
+function deviceDefaults(): BrowserSettings {
+  const base = { ...DEFAULT_BROWSER_SETTINGS };
+  try {
+    if (recommendSpeechModel(readDeviceFacts()).size === "small") {
+      const small = SPEECH_MODEL_CATALOG.find((o) => o.repoId === "onnx-community/whisper-small");
+      if (small) return { ...base, whisperModel: small.repoId, whisperDtype: small.dtype };
+    }
+  } catch {
+    // Device detection is best-effort; fall back to the static defaults.
+  }
+  return base;
+}
+
 function readFromStorage(): BrowserSettings {
   try {
     const raw = localStorage.getItem(SETTINGS_STORAGE_KEY);
-    if (!raw) return { ...DEFAULT_BROWSER_SETTINGS };
+    if (!raw) return deviceDefaults();
+    // A saved choice (from Settings or the download dialog) always wins over the device default.
     const parsed = JSON.parse(raw) as Partial<BrowserSettings>;
-    return { ...DEFAULT_BROWSER_SETTINGS, ...parsed };
+    return { ...deviceDefaults(), ...parsed };
   } catch {
-    return { ...DEFAULT_BROWSER_SETTINGS };
+    return deviceDefaults();
   }
 }
 

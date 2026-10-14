@@ -10,6 +10,7 @@ import {
   DEFAULT_FIREBASE_PROJECT_ID,
   buildPreviewMeta,
   canonicalPageUrl,
+  isReplacedPreviewTag,
   firestoreDocUrl,
   isPlausibleId,
   previewFromFirestoreDoc,
@@ -53,6 +54,19 @@ export const onRequestGet: PagesFunction<Env, "id"> = async (context) => {
     .on("title", {
       element(el) {
         el.setInnerContent(meta.title); // text, escaped by HTMLRewriter
+      },
+    })
+    // Drop the homepage's own preview tags (web/index.html) so crawlers see only the recipe's.
+    .on("meta", {
+      element(el) {
+        const property = el.getAttribute("property");
+        const name = el.getAttribute("name");
+        if (
+          (property && isReplacedPreviewTag("property", property.toLowerCase())) ||
+          (name && isReplacedPreviewTag("name", name.toLowerCase()))
+        ) {
+          el.remove();
+        }
       },
     })
     .on("head", {

@@ -145,8 +145,24 @@ export function canonicalPageUrl(requestUrl: string, publicId: string): string {
  * String version of the Pages Function's HTMLRewriter step, for Node (the API's GET /r/:id):
  * replaces the first <title> and appends the meta tags just before </head>.
  */
+/**
+ * The homepage's own preview tags (web/index.html) that a recipe page must replace, not add
+ * to — crawlers take the FIRST og:title/og:image they see.
+ */
+export function isReplacedPreviewTag(attr: "property" | "name", key: string): boolean {
+  return (
+    (attr === "property" && key.startsWith("og:")) ||
+    (attr === "name" && (key.startsWith("twitter:") || key === "description"))
+  );
+}
+
+const PREVIEW_META_TAG = /<meta\s+(property|name)="([^"]+)"[^>]*>\s*/gi;
+
 export function injectPreviewIntoHtml(html: string, meta: { title: string; tags: MetaTag[] }): string {
-  const withTitle = html.replace(/<title>[\s\S]*?<\/title>/i, `<title>${escapeHtml(meta.title)}</title>`);
+  const withoutHomepageTags = html.replace(PREVIEW_META_TAG, (tag, attr: string, key: string) =>
+    isReplacedPreviewTag(attr.toLowerCase() as "property" | "name", key.toLowerCase()) ? "" : tag,
+  );
+  const withTitle = withoutHomepageTags.replace(/<title>[\s\S]*?<\/title>/i, `<title>${escapeHtml(meta.title)}</title>`);
   const i = withTitle.search(/<\/head>/i);
   if (i === -1) return withTitle;
   return `${withTitle.slice(0, i)}${renderMetaTags(meta.tags)}\n${withTitle.slice(i)}`;
