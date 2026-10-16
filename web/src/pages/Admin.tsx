@@ -7,6 +7,7 @@ import { publicHref } from "@/lib/router";
 import { Button } from "@/components/ui/button";
 import { PublicStatusPill } from "@/components/publish/PublicStatusPill";
 import { RecipeThumbnail, creditLine } from "@/components/public/PublicRecipeCard";
+import { StatsSection } from "@/components/admin/StatsSection";
 
 type Item = AdminQueueResponse["items"][number];
 type Action = "hide" | "restore" | "dismiss";
@@ -17,7 +18,8 @@ const KIND_LABEL: Record<Item["report"]["kind"], string> = {
   screening: "Flagged by screening",
 };
 
-/** Moderation queue (admin accounts only — the API checks the admin claim). */
+/** Admin page: launch stats + the moderation queue (admin accounts only — the API checks the
+ * admin claim for both). */
 export function Admin() {
   const [items, setItems] = useState<Item[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -60,11 +62,14 @@ export function Admin() {
       >
         <ArrowLeft className="h-4 w-4" /> Back to library
       </a>
+      <h1 className="sr-only">Admin</h1>
+      <StatsSection />
+      <hr className="border-[hsl(var(--border))]" />
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div className="space-y-1">
-          <h1 className="font-serif text-[34px] sm:text-[40px] leading-[1.05] tracking-[-0.01em] text-[hsl(var(--ink))]">
+          <h2 className="font-serif text-[28px] sm:text-[32px] leading-[1.05] tracking-[-0.01em] text-[hsl(var(--ink))]">
             Moderation
-          </h1>
+          </h2>
           <p className="text-sm text-[hsl(var(--ink-muted))]">Open reports, creator claims, and publishes flagged by screening.</p>
         </div>
         <Button size="sm" variant="outline" onClick={load}>

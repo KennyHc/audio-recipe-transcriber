@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { BACKUP_FORMAT, BACKUP_VERSION, type CloudRecipe, type Job, type MeResponse, type VersionedRecipe } from "@recipe/shared";
 import * as db from "../browser/db";
 import * as runner from "../browser/runner";
+import { createCaptionsJob } from "../browser";
 import { transcribeAudio } from "../browser/transcribe";
 import { isModelCached } from "../browser/modelCatalog";
 import { ensureModelDownloaded } from "../browser/modelDownloader";
@@ -148,6 +149,7 @@ beforeEach(() => {
         })(),
         cancel: () => undefined,
       }),
+      createFromCaptions: createCaptionsJob,
       getProgress: (id) => runner.getProgress(id),
       resumeAfterModelConsent: async (id) => (await db.getJob(id))!,
     },
@@ -208,7 +210,8 @@ describe("upload → transcribe → POST /recipes", () => {
   it("carries the video link entered at upload into POST /recipes (sourceUrl), then forgets it", async () => {
     const url = "https://www.youtube.com/watch?v=qH__o17xHls";
     const job = await backend.uploadAudio(new File(["x"], "pasta.mp3"), () => undefined, { sourceUrl: url }).promise;
-    expect(localJobSourceUrl(job.id)).toBe(url);
+    // (No check of the stored link here: the fake pipeline can finish — and forget it —
+    // before this line runs. The POST body below proves it was carried through.)
     await waitFor(async () => (await backend.getJob(job.id)).status === "done");
     expect(api.createRecipe).toHaveBeenCalledWith({ id: job.id, fileName: "pasta.mp3", transcript, sourceUrl: url });
     expect(localJobSourceUrl(job.id)).toBeNull();
@@ -234,6 +237,64 @@ describe("upload → transcribe → POST /recipes", () => {
   it("refuses to upload while signed out", async () => {
     signedIn = null;
     await expect(backend.uploadAudio(new File(["x"], "a.mp3"), () => undefined).promise).rejects.toThrow(/Sign in/);
+  });
+});
+
+describe("captions → POST /recipes (no audio, no Whisper)", () => {
+  const captions = "0:00\nToday, egg fried rice\n0:05\nBeat two eggs\n0:12\nFry the rice in hot oil";
+
+  it("sends the parsed transcript with the video link and a captions file name; nothing is transcribed", async () => {
+    const url = "https://www.youtube.com/watch?v=qH__o17xHls";
+    const job = await backend.createFromCaptions({ text: captions }, { sourceUrl: url });
+    expect(job.fileName).toBe("Pasted captions");
+    await waitFor(async () => (await backend.getJob(job.id)).status === "done");
+    expect(transcribeAudio).not.toHaveBeenCalled();
+    expect(isModelCached).not.toHaveBeenCalled();
+    const body = api.createRecipe.mock.calls[0][0];
+    expect(body).toMatchObject({ id: job.id, fileName: "Pasted captions", sourceUrl: url });
+    expect(body.transcript.segments.map((s: { start: number }) => s.start)).toEqual([0, 5, 12]);
+    expect(localJobSourceUrl(job.id)).toBeNull();
+    expect(await db.getAudio(job.id)).toBeNull();
+  });
+
+  it("uses the caption file's name, and sends untimed plain text as-is (the API strips timestamps)", async () => {
+    const job = await backend.createFromCaptions({ text: "Beat two eggs. Fry the rice.", fileName: "fried-rice.txt" });
+    await waitFor(async () => (await backend.getJob(job.id)).status === "done");
+    const body = api.createRecipe.mock.calls[0][0];
+    expect(body.fileName).toBe("fried-rice.txt");
+    expect(body.transcript.segments.every((s: { start: number; end: number }) => s.start === 0 && s.end === 0)).toBe(true);
+    expect(body).not.toHaveProperty("sourceUrl");
+  });
+
+  it("Retry after a failed POST re-sends the captions (there's no audio to re-transcribe)", async () => {
+    api.createRecipe.mockRejectedValueOnce(new CloudApiError("budget_exhausted", "Try again tomorrow.", 503));
+    const job = await backend.createFromCaptions({ text: captions }, { sourceUrl: "https://youtu.be/qH__o17xHls" });
+    await waitFor(async () => (await backend.getJob(job.id)).status === "error");
+    await backend.retry(job.id);
+    await waitFor(async () => (await backend.getJob(job.id)).status === "done");
+    expect(api.createRecipe).toHaveBeenCalledTimes(2);
+    expect(api.createRecipe.mock.calls[1][0].sourceUrl).toBe("https://youtu.be/qH__o17xHls");
+    expect(transcribeAudio).not.toHaveBeenCalled();
+  });
+
+  it("refuses unusable text and signed-out visitors, creating nothing", async () => {
+    await expect(backend.createFromCaptions({ text: "  " })).rejects.toThrow(/Paste the video's transcript/);
+    signedIn = null;
+    await expect(backend.createFromCaptions({ text: captions })).rejects.toThrow(/Sign in/);
+    expect(await db.listJobs()).toEqual([]);
+  });
+
+  it("never sends another account's pending upload under this one", async () => {
+    const job = await backend.createFromCaptions({ text: captions });
+    await waitFor(async () => (await backend.getJob(job.id)).status === "done");
+    api.createRecipe.mockClear();
+    // A pending job owned by someone else on this device.
+    await seedLocalJob("bobs-job", { status: "error" }, "bob");
+    await db.saveTranscript("bobs-job", transcript);
+    await runner.runReextract("bobs-job");
+    await waitFor(async () => (await db.getJob("bobs-job"))?.status === "error");
+    expect((await db.getJob("bobs-job"))?.error).toMatch(/another account/);
+    expect(api.createRecipe).not.toHaveBeenCalled();
   });
 });
 

@@ -10,6 +10,8 @@ import {
   DEFAULT_FIREBASE_PROJECT_ID,
   buildPreviewMeta,
   canonicalPageUrl,
+  fromFirestoreFields,
+  recipeHeadExtras,
   isReplacedPreviewTag,
   firestoreDocUrl,
   isPlausibleId,
@@ -25,7 +27,7 @@ interface Env {
 
 const FIRESTORE_TIMEOUT_MS = 2500;
 
-async function loadPreview(env: Env, id: string): Promise<PreviewInfo | null> {
+async function loadPreview(env: Env, id: string): Promise<{ info: PreviewInfo; extras: string } | null> {
   if (!isPlausibleId(id)) return null;
   const projectId = env.FIREBASE_PROJECT_ID?.trim() || DEFAULT_FIREBASE_PROJECT_ID;
   try {
@@ -35,7 +37,10 @@ async function loadPreview(env: Env, id: string): Promise<PreviewInfo | null> {
       cf: { cacheTtl: 60, cacheEverything: true },
     });
     if (!res.ok) return null; // 403 (not live), 404 (missing), …
-    return previewFromFirestoreDoc(await res.json());
+    const doc = (await res.json()) as { fields?: Record<string, unknown> };
+    const info = previewFromFirestoreDoc(doc);
+    // Canonical URL + schema.org Recipe JSON-LD for search engines (shared with the API).
+    return info ? { info, extras: recipeHeadExtras(fromFirestoreFields(doc.fields), id) } : null;
   } catch {
     return null;
   }
@@ -46,8 +51,9 @@ export const onRequestGet: PagesFunction<Env, "id"> = async (context) => {
   const id = Array.isArray(params.id) ? params.id[0] ?? "" : params.id;
 
   const indexResponse = await env.ASSETS.fetch(new URL("/", request.url).toString());
-  const info = indexResponse.ok ? await loadPreview(env, id) : null;
-  if (!info) return indexResponse;
+  const loaded = indexResponse.ok ? await loadPreview(env, id) : null;
+  if (!loaded) return indexResponse;
+  const { info, extras } = loaded;
 
   const meta = buildPreviewMeta(info, canonicalPageUrl(request.url, id));
   const rewritten = new HTMLRewriter()
@@ -71,7 +77,8 @@ export const onRequestGet: PagesFunction<Env, "id"> = async (context) => {
     })
     .on("head", {
       element(el) {
-        el.append(renderMetaTags(meta.tags), { html: true }); // values escaped in renderMetaTags
+        // Values escaped in renderMetaTags; JSON-LD has "<" escaped in jsonLdScript.
+        el.append(`${renderMetaTags(meta.tags)}\n${extras}`, { html: true });
       },
     })
     .transform(indexResponse);

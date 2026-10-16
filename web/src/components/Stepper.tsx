@@ -14,12 +14,15 @@ function stepIndex(status: JobStatus): number {
   return STEPS.findIndex((s) => s.status === status);
 }
 
-export function Stepper({ status }: { status: JobStatus }) {
+/** `fromCaptions`: a job made from pasted captions has no transcription — its first step reads
+ * the captions instead. */
+export function Stepper({ status, fromCaptions = false }: { status: JobStatus; fromCaptions?: boolean }) {
   const current = stepIndex(status);
+  const steps = fromCaptions ? STEPS.map((s, i) => (i === 0 ? { ...s, label: "Captions read" } : s)) : STEPS;
 
   return (
     <ol className="flex flex-col sm:flex-row gap-4 sm:gap-2 sm:items-center">
-      {STEPS.map((step, i) => {
+      {steps.map((step, i) => {
         const isDone = current > i || status === "done";
         const isActive = current === i && status !== "done";
         return (

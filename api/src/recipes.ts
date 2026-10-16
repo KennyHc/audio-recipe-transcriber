@@ -19,6 +19,7 @@ import type { DecodedIdToken } from "firebase-admin/auth";
 import { profileFromToken } from "./auth";
 import { appError, sanitizedErrorLog } from "./errors";
 import { extractAndVerify, type PipelineDeps } from "./pipeline";
+import { countStat } from "./stats";
 import { consumeQuotaOrThrow, currentUsage, refundQuota } from "./users";
 import { assertTranscriptSizeOrThrow, RECIPE_ID_PATTERN } from "./validation";
 
@@ -81,6 +82,7 @@ export async function createRecipe(
     batch.create(versionRef(db, body.id, 1), version);
     batch.create(transcriptRef(db, body.id), transcriptDoc);
     await batch.commit();
+    await countStat(db, "recipe_created", deps.now(), deps.logger);
 
     return { status: 201, response: { recipe: { ...doc, id: body.id }, version, usage: quota.usage } };
   } catch (err) {

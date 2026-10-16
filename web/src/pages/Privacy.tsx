@@ -272,10 +272,30 @@ export function Privacy() {
         <SectionLabel>{IS_CLOUD ? "No ads, no tracking" : "No accounts, no ads, no tracking"}</SectionLabel>
         <p className="text-[hsl(var(--ink))] leading-relaxed">
           {IS_CLOUD
-            ? "There's no advertising, and no analytics or tracking cookies. Your recipes are never shared or made public unless you publish them. Your theme choice and settings live in this browser's local storage; signing in keeps a session in this browser."
+            ? "There's no advertising, no tracking cookies, and no third-party analytics. Your recipes are never shared or made public unless you publish them. Your theme choice and settings live in this browser's local storage; signing in keeps a session in this browser."
             : "There's no sign-up, no advertising, and no analytics or tracking cookies. Your theme choice and settings live in this browser's local storage, not on any server."}
         </p>
       </section>
+
+      {IS_CLOUD && (
+        <section className="space-y-2">
+          <SectionLabel>Anonymous visit counts</SectionLabel>
+          <p className="text-[hsl(var(--ink))] leading-relaxed">
+            To know whether the app is useful, we keep a few daily totals — nothing more. Your browser
+            adds one to a day's count when you open the app, view a public recipe, open Explore, or
+            start a recipe from pasted captions; our server counts sign-ups, recipes created, and
+            recipes published the same way. Your browser counts each thing at most once per tab
+            session (a recipe view once per recipe).
+          </p>
+          <p className="text-[hsl(var(--ink))] leading-relaxed">
+            These are just numbers per day. There are no cookies, no ids or fingerprints, no IP
+            addresses stored, and no record of who did what. A small "already counted" note stays in
+            this tab's session storage and disappears when you close it. If your browser sends{" "}
+            <strong>Do Not Track</strong> or <strong>Global Privacy Control</strong>, nothing is
+            counted at all.
+          </p>
+        </section>
+      )}
 
       <section className="space-y-2">
         <SectionLabel>Contact</SectionLabel>

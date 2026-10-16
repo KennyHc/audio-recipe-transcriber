@@ -6,6 +6,7 @@
 import { openDB, type DBSchema, type IDBPDatabase } from "idb";
 import type { Job, Recipe, RecipeVersionMeta, Transcript, VersionedRecipe, VersionSource } from "@recipe/shared";
 import { BROWSER_DB_NAME } from "../constants";
+import { clearCheckpoint } from "./checkpoints";
 
 const DB_VERSION = 1;
 
@@ -118,6 +119,8 @@ export async function deleteJobRecord(jobId: string, options: { keepAudio?: bool
     ...versionKeys.map((key) => tx.objectStore("versions").delete(key)),
     tx.done,
   ]);
+  // Any half-finished transcription of it (separate database; never throws).
+  await clearCheckpoint(jobId);
 }
 
 // ---------------------------------------------------------------------------

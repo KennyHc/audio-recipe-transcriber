@@ -20,6 +20,7 @@ import type { MeResponse } from "@recipe/shared";
 import type { Account, AccountUser } from "../account";
 import { BROWSER_DB_NAME } from "../constants";
 import * as db from "../browser/db";
+import { deleteAllCheckpoints } from "../browser/checkpoints";
 import type { ApiClient } from "./api";
 import { CloudApiError } from "./errors";
 import type { RecipeStore } from "./store";
@@ -97,6 +98,7 @@ async function deleteLocalDatabase(): Promise<void> {
     req.onerror = () => resolve();
     req.onblocked = () => resolve();
   });
+  await deleteAllCheckpoints();
 }
 
 export interface AccountDeps {

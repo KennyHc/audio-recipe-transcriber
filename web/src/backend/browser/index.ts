@@ -5,7 +5,8 @@
 // since there's no HTTP layer here — the UI calls these methods directly.
 
 import { Recipe, Transcript as TranscriptSchema, type Job, type Recipe as RecipeType, type RecipeVersionMeta, type Transcript, type VersionedRecipe } from "@recipe/shared";
-import type { Backend, JobProgress } from "../types";
+import type { Backend, CaptionsInput, CaptionsOptions, JobProgress } from "../types";
+import { captionsJobFileName, parseCaptionsOrThrow } from "@/lib/captions";
 import * as db from "./db";
 import * as runner from "./runner";
 import { exportLibrary, importLibrary } from "./backup";
@@ -32,6 +33,30 @@ function newJobId(): string {
   }
   // Fallback for environments without crypto.randomUUID (older browsers / some test runners).
   return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
+/**
+ * "Paste captions instead": a local job WITHOUT audio, whose parsed transcript is saved up front
+ * and goes straight to the finish step (extract + verify here; POST /recipes in cloud mode).
+ * Exported so cloud mode's tests can use the real thing without a whole browser backend.
+ */
+export async function createCaptionsJob(input: CaptionsInput, options?: CaptionsOptions): Promise<Job> {
+  const { transcript } = parseCaptionsOrThrow(input.text);
+  const id = newJobId();
+  const now = new Date().toISOString();
+  await db.createJob({
+    id,
+    fileName: captionsJobFileName(input.fileName),
+    status: "queued",
+    error: null,
+    title: null,
+    createdAt: now,
+    updatedAt: now,
+  });
+  await db.saveTranscript(id, transcript);
+  options?.onJobCreated?.(id);
+  await runner.runFromTranscript(id);
+  return requireJob(id);
 }
 
 export function createBrowserBackend(): Backend {
@@ -122,6 +147,13 @@ export function createBrowserBackend(): Backend {
       }
       const audio = await db.getAudio(id);
       if (!audio) {
+        // A captions job has no audio: there's nothing to re-transcribe, so make the recipe again
+        // from its saved transcript.
+        if (await db.getTranscript(id)) {
+          if ((await db.listVersions(id)).length === 0) await runner.runFromTranscript(id);
+          else await runner.runReextract(id);
+          return requireJob(id);
+        }
         throw new Error("Original audio file is missing; cannot retry. Re-upload the audio instead.");
       }
       await runner.runRetry(id);
@@ -214,6 +246,10 @@ export function createBrowserBackend(): Backend {
         },
       };
     },
+
+    canUseCaptions: true,
+
+    createFromCaptions: createCaptionsJob,
 
     getProgress(id: string): JobProgress | null {
       return runner.getProgress(id);

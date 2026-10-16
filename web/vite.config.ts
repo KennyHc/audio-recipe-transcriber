@@ -30,6 +30,8 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "src"),
+      // Firestore's Pipelines-only regex engine (~140 KB); unused here — see src/lib/re2jsStub.ts.
+      re2js: path.resolve(__dirname, "src/lib/re2jsStub.ts"),
     },
   },
   build: {

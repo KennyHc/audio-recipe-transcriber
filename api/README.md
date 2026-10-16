@@ -27,7 +27,10 @@ Phase 2 (`shared/public.ts`; all need App Check):
 | `POST /public/:id/copy` | signed in | private copy (v1 `edited`, note "Copied from @handle's recipe"); no Claude, no quota; counts toward the 300/day |
 | `POST /public/:id/report` | ID token optional | report/claim (claims need `contact`); 10/day per user and per hashed IP; 202 |
 | `POST /client-errors` | ID token optional | privacy-safe browser error report (shared/telemetry.ts): re-sanitized, logged as `{"event":"client_error"}`, never stored; 50/day per hashed IP; 204 |
-| `GET /r/:id` | none (crawlers) | link previews on Firebase Hosting (`/r/**` rewritten here): the site's index.html with Open Graph tags for a live recipe, else unchanged |
+| `POST /beacon` | App Check only | anonymous daily counts (shared/stats.ts): visit, recipe_view, explore_view, captions_used — no identity stored; 204 |
+| `GET /admin/stats?days=N` | `admin` claim | daily totals (beacons + server-counted signup / recipe_created / publish), sharded docs summed; N ≤ 90 |
+| `GET /sitemap.xml` | none (crawlers) | live public recipes + creator pages, canonical web.app URLs (Hosting rewrites it here) |
+| `GET /r/:id` | none (crawlers) | link previews on Firebase Hosting (`/r/**` rewritten here): the site's index.html with Open Graph tags, a canonical link, and schema.org Recipe JSON-LD for a live recipe, else unchanged |
 | `GET /admin/queue`, `POST /admin/public/:id` | `admin` claim | open reports newest first + their recipe; `hide` / `restore` / `dismiss` |
 
 **Outgoing requests (SSRF):** only `https://www.youtube.com/oembed`, `https://www.tiktok.com/oembed`,

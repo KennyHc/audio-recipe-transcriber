@@ -4,6 +4,7 @@
  */
 import { COLLECTIONS, type Usage, UserDoc } from "@recipe/shared";
 import type { DocumentReference, Firestore, Transaction } from "firebase-admin/firestore";
+import { countStat } from "./stats";
 import { appError } from "./errors";
 import { refundUsage, toUsage, tryConsume, type UsageState } from "./quota";
 import { utcMonthString } from "./time";
@@ -51,11 +52,15 @@ async function readOrNewInTx(
 
 export async function getOrCreateUser(db: Firestore, uid: string, profile: UserProfile, now: Date): Promise<UserDoc> {
   const ref = userRef(db, uid);
-  return db.runTransaction(async (tx) => {
+  let createdNow = false; // set by the attempt that commits (transactions may retry)
+  const doc = await db.runTransaction(async (tx) => {
     const { doc, created } = await readOrNewInTx(tx, ref, profile, now);
+    createdNow = created;
     if (created) tx.create(ref, doc);
     return doc;
   });
+  if (createdNow) await countStat(db, "signup", now);
+  return doc;
 }
 
 export interface ConsumedQuota {
@@ -74,8 +79,10 @@ export async function consumeQuotaOrThrow(
   now: Date,
 ): Promise<ConsumedQuota> {
   const ref = userRef(db, uid);
+  let createdNow = false;
   const result = await db.runTransaction(async (tx) => {
     const { doc, created } = await readOrNewInTx(tx, ref, profile, now);
+    createdNow = created;
     const consumed = tryConsume(doc.usage, now, limit);
     if (!consumed.ok) {
       if (created) tx.create(ref, doc);
@@ -88,6 +95,7 @@ export async function consumeQuotaOrThrow(
     }
     return consumed;
   });
+  if (createdNow) await countStat(db, "signup", now);
   if (!result.ok) throw appError("quota_exceeded", result.retryAfterSeconds);
   return { usage: toUsage(result.state, now, limit), month: result.state.month };
 }

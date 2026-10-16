@@ -51,7 +51,7 @@ export interface CloudBackendDeps {
   api: ApiClient;
   usage: UsageCache;
   /** The browser backend, for upload/progress/model consent (same IndexedDB + runner). */
-  local: Pick<Backend, "uploadAudio" | "getProgress" | "resumeAfterModelConsent">;
+  local: Pick<Backend, "uploadAudio" | "createFromCaptions" | "getProgress" | "resumeAfterModelConsent">;
 }
 
 /** A local job is one of this user's in-flight uploads (vs. the old local library). */
@@ -224,6 +224,21 @@ export function createCloudBackend(deps: CloudBackendDeps): Backend {
         }),
         cancel: upload.cancel,
       };
+    },
+
+    canUseCaptions: true,
+
+    async createFromCaptions(input, options) {
+      const uid = session.currentUid();
+      if (!uid) throw new Error("Sign in to add a recipe.");
+      return local.createFromCaptions(input, {
+        // Recorded before the pipeline starts: with no transcription to wait for, the finish
+        // step (POST /recipes) can run right away and reads the owner and link.
+        onJobCreated: (jobId) => {
+          markLocalJob(jobId, uid);
+          if (options?.sourceUrl) setLocalJobSourceUrl(jobId, options.sourceUrl);
+        },
+      });
     },
 
     getProgress(id: string): JobProgress | null {

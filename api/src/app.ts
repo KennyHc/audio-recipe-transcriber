@@ -11,6 +11,8 @@ import {
   PublishRequest,
   PublishSuggestionsRequest,
   ClientErrorReport,
+  BeaconRequest,
+  MAX_STATS_DAYS,
   ReportRequest,
 } from "@recipe/shared";
 import type { Firestore } from "firebase-admin/firestore";
@@ -39,7 +41,9 @@ import { publishRecipe, type PublicDeps, unpublishRecipe } from "./publish";
 import { createRecipe, reextractRecipe } from "./recipes";
 import { publishSuggestions } from "./suggestions";
 import { recordClientError } from "./telemetry";
+import { adminStats, incrementStat } from "./stats";
 import { previewPage } from "./preview";
+import { sitemapXml } from "./sitemap";
 import { type FetchLike, MAX_SOURCE_URL_CHARS, previewSource } from "./sources";
 import {
   DEFAULT_BODY_LIMIT_BYTES,
@@ -172,12 +176,32 @@ export function createApp(deps: AppDeps): Hono<{ Variables: AuthVariables }> {
   });
 
   // Works signed out: App Check required, ID token optional.
+  // Anonymous launch counts (shared/stats.ts): one increment, no identity at all.
+  app.post("/beacon", appCheck, async (c) => {
+    const body = parseBodyOrThrow(BeaconRequest, await readJsonBody(c.req.raw, PUBLIC_BODY_LIMIT_BYTES));
+    await incrementStat(db, body.kind, now());
+    return c.body(null, 204);
+  });
+
+  app.get("/admin/stats", appCheck, user, requireAdmin, async (c) => {
+    const days = Number(c.req.query("days") ?? 14);
+    if (!Number.isFinite(days) || days < 1 || days > MAX_STATS_DAYS) throw appError("bad_request");
+    return c.json(await adminStats(db, now(), days), 200);
+  });
+
   // Privacy-safe browser error reports (shared/telemetry.ts): logged, never stored.
   app.post("/client-errors", appCheck, optionalUser(auth), async (c) => {
     const body = parseBodyOrThrow(ClientErrorReport, await readJsonBody(c.req.raw, PUBLIC_BODY_LIMIT_BYTES));
     const ip = clientIp(c.req.header("X-Forwarded-For"));
     await recordClientError({ db, logger, now: now(), salt: config.reportSalt }, ip, c.get("optionalUser") !== null, body);
     return c.body(null, 204);
+  });
+
+  // Search engines: every live public recipe + creator page (Hosting rewrites /sitemap.xml).
+  app.get("/sitemap.xml", async (c) => {
+    c.header("Content-Type", "application/xml; charset=utf-8");
+    c.header("Cache-Control", "public, max-age=0, s-maxage=3600");
+    return c.body(await sitemapXml(db), 200);
   });
 
   // Link previews for /r/{id} on Firebase Hosting (rewritten here). No auth: crawlers.

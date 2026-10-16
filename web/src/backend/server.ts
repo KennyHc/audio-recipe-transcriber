@@ -26,6 +26,10 @@ export function createServerBackend(): Backend {
 
     uploadAudio: (file, onProgress) => api.uploadAudio(file, onProgress),
 
+    // The local server transcribes with whisper.cpp; pasting captions is a browser-mode feature.
+    canUseCaptions: false,
+    createFromCaptions: () => Promise.reject(new Error("Pasting captions isn't available when running your own server.")),
+
     // The server backend has no fine-grained in-browser stage to report; Job.status +
     // the existing Stepper cover it.
     getProgress: (_id): JobProgress | null => null,

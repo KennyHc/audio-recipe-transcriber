@@ -1,6 +1,7 @@
 import type {
   AdminActionRequest,
   AdminQueueResponse,
+  AdminStatsResponse,
   CloudRecipe,
   EngagementResponse,
   PublicRecipe,
@@ -74,4 +75,6 @@ export interface PublicBank {
   report(publicId: string, body: ReportRequest): Promise<void>;
   adminQueue(): Promise<AdminQueueResponse>;
   adminAction(publicId: string, body: AdminActionRequest): Promise<void>;
+  /** Anonymous daily totals for the last `days` days (admins only; shared/stats.ts). */
+  adminStats(days: number): Promise<AdminStatsResponse>;
 }

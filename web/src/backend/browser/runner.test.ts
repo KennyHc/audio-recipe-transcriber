@@ -6,9 +6,13 @@ import { extractRecipe, verifyRecipe } from "./claude";
 import { transcribeAudio } from "./transcribe";
 import { isModelCached } from "./modelCatalog";
 import { ensureModelDownloaded } from "./modelDownloader";
+import { getCheckpoint, deleteAllCheckpoints, noteAutoResume } from "./checkpoints";
+import { holdScreenWakeLock } from "@/lib/wakeLock";
 import {
   getProgress,
   isAwaitingModelConsent,
+  isInterruption,
+  runFromTranscript,
   recoverInterruptedJobs,
   resumeAfterConsent,
   runPipeline,
@@ -31,6 +35,8 @@ vi.mock("./claude", () => ({
 }));
 vi.mock("./modelCatalog", () => ({ isModelCached: vi.fn() }));
 vi.mock("./modelDownloader", () => ({ ensureModelDownloaded: vi.fn(), InsufficientStorageError: class extends Error {} }));
+vi.mock("@/lib/wakeLock", () => ({ holdScreenWakeLock: vi.fn() }));
+const releaseWakeLock = vi.fn();
 
 const transcript: Transcript = {
   language: "en",
@@ -98,10 +104,12 @@ beforeEach(() => {
   // worker's transcribeAudio() call is reached (matching startPipeline's isModelCached gate
   // having already established the model is available).
   vi.mocked(ensureModelDownloaded).mockResolvedValue(undefined);
+  vi.mocked(holdScreenWakeLock).mockReturnValue(releaseWakeLock);
 });
 
 afterEach(async () => {
   vi.resetAllMocks();
+  await deleteAllCheckpoints();
   await db.deleteJobRecord(jobId).catch(() => undefined);
   await db._resetDbConnectionForTests();
   await new Promise<void>((resolve, reject) => {
@@ -372,5 +380,158 @@ describe("error reports", () => {
     await recoverInterruptedJobs();
     expect(report).not.toHaveBeenCalled();
     report.mockRestore();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Captions (no audio) and surviving phone suspensions
+// ---------------------------------------------------------------------------
+
+const untimed: Transcript = {
+  language: null,
+  segments: [
+    { start: 0, end: 0, text: "Two cups of flour." },
+    { start: 0, end: 0, text: "Mix it well." },
+  ],
+};
+
+describe("runFromTranscript (pasted captions)", () => {
+  it("makes the recipe straight from the saved transcript — no model, no transcription", async () => {
+    await seedJob({ fileName: "Pasted captions" });
+    await db.saveTranscript(jobId, transcript);
+
+    await runFromTranscript(jobId);
+    expect((await db.getJob(jobId))?.status).toBe("queued");
+    const job = await waitForStatus("done");
+
+    expect(job.title).toBe("Flour Mix");
+    expect(transcribeAudio).not.toHaveBeenCalled();
+    expect(ensureModelDownloaded).not.toHaveBeenCalled();
+    expect(isModelCached).not.toHaveBeenCalled();
+    const latest = await db.getLatestVersion(jobId);
+    expect(latest?.meta).toMatchObject({ version: 1, source: "extracted" });
+    // Timed captions keep their timestamps.
+    expect(latest?.recipe.steps[0]?.timestamp).toBe(4);
+  });
+
+  it("clears the timestamps the extractor copied from untimed (plain-text) captions", async () => {
+    vi.mocked(extractRecipe).mockResolvedValue({
+      ...extracted,
+      ingredients: extracted.ingredients.map((i) => ({ ...i, timestamp: 0 })),
+      steps: extracted.steps.map((st) => ({ ...st, timestamp: 0 })),
+      tips: [{ text: "Sift first", timestamp: 0 }],
+    });
+    await seedJob({ fileName: "Pasted captions" });
+    await db.saveTranscript(jobId, untimed);
+
+    await runFromTranscript(jobId);
+    await waitForStatus("done");
+
+    const recipe = (await db.getLatestVersion(jobId))!.recipe;
+    expect(recipe.ingredients.every((i) => i.timestamp === null)).toBe(true);
+    expect(recipe.steps.every((st) => st.timestamp === null)).toBe(true);
+    expect(recipe.tips.every((t) => t.timestamp === null)).toBe(true);
+    // The verifier saw the cleaned recipe too.
+    expect(vi.mocked(verifyRecipe).mock.calls[0]![1].steps[0]!.timestamp).toBeNull();
+  });
+});
+
+describe("screen wake lock while transcribing", () => {
+  it("holds it during transcription and releases it when done", async () => {
+    let heldDuring = false;
+    vi.mocked(transcribeAudio).mockImplementation(async () => {
+      heldDuring = vi.mocked(holdScreenWakeLock).mock.calls.length === 1 && releaseWakeLock.mock.calls.length === 0;
+      return transcript;
+    });
+    await seedJob();
+    await db.saveAudio(jobId, "clip.mp3", new Blob(["audio"]));
+    await runPipeline(jobId);
+    await waitForStatus("done");
+    expect(heldDuring).toBe(true);
+    expect(releaseWakeLock).toHaveBeenCalledTimes(1);
+  });
+
+  it("releases it when transcription fails", async () => {
+    vi.mocked(transcribeAudio).mockRejectedValue(new Error("decode failed"));
+    await seedJob();
+    await db.saveAudio(jobId, "clip.mp3", new Blob(["audio"]));
+    await runPipeline(jobId);
+    await waitForStatus("error");
+    expect(releaseWakeLock).toHaveBeenCalledTimes(1);
+  });
+
+  it("isn't taken for a captions job", async () => {
+    await seedJob({ fileName: "Pasted captions" });
+    await db.saveTranscript(jobId, transcript);
+    await runFromTranscript(jobId);
+    await waitForStatus("done");
+    expect(holdScreenWakeLock).not.toHaveBeenCalled();
+  });
+});
+
+describe("resuming an interrupted transcription", () => {
+  it("isInterruption: a stalled worker always; a worker failure only if the tab was hidden", () => {
+    const failed = Object.assign(new Error("GPU lost"), { name: "TranscriptionError" });
+    const stalled = Object.assign(new Error("stopped"), { name: "TranscriptionStalledError" });
+    expect(isInterruption(stalled, false)).toBe(true);
+    expect(isInterruption(failed, true)).toBe(true);
+    expect(isInterruption(failed, false)).toBe(false);
+    expect(isInterruption(new Error("boom"), true)).toBe(false);
+  });
+
+  it("restarts in the same session after the worker stalled", async () => {
+    vi.mocked(transcribeAudio)
+      .mockRejectedValueOnce(Object.assign(new Error("stopped"), { name: "TranscriptionStalledError" }))
+      .mockResolvedValueOnce(transcript);
+    await seedJob();
+    await db.saveAudio(jobId, "clip.mp3", new Blob(["audio"]));
+    await runPipeline(jobId);
+    const job = await waitForStatus("done");
+    expect(job.error).toBeNull();
+    expect(transcribeAudio).toHaveBeenCalledTimes(2);
+    // The second attempt re-runs the whole clip (no mid-clip checkpoints — see transcribe.ts).
+  });
+
+  it("doesn't loop on a real failure", async () => {
+    vi.mocked(transcribeAudio).mockRejectedValue(Object.assign(new Error("Unsupported audio"), { name: "TranscriptionError" }));
+    await seedJob();
+    await db.saveAudio(jobId, "clip.mp3", new Blob(["audio"]));
+    await runPipeline(jobId);
+    await waitForStatus("error");
+    expect(transcribeAudio).toHaveBeenCalledTimes(1);
+  });
+
+  it("on load, automatically restarts a job that was transcribing (its audio is here)", async () => {
+    await seedJob({ status: "transcribing" });
+    await db.saveAudio(jobId, "clip.mp3", new Blob(["audio"]));
+    await recoverInterruptedJobs();
+    const job = await waitForStatus("done");
+    expect(job.error).toBeNull();
+    expect(transcribeAudio).toHaveBeenCalledTimes(1);
+    // The checkpoint (and its resume counter) is cleared once the transcript is saved.
+    expect(await getCheckpoint(jobId)).toBeNull();
+  });
+
+  it("on load, gives up after 3 automatic resumes and points at Retry", async () => {
+    await seedJob({ status: "transcribing" });
+    await db.saveAudio(jobId, "clip.mp3", new Blob(["audio"]));
+    for (let i = 0; i < 3; i++) await noteAutoResume(jobId);
+    await recoverInterruptedJobs();
+    const job = await db.getJob(jobId);
+    expect(job?.status).toBe("error");
+    expect(job?.error).toMatch(/Retry/);
+    expect(transcribeAudio).not.toHaveBeenCalled();
+  });
+
+  it("Retry allows automatic resumes again", async () => {
+    await seedJob({ status: "error", error: "Interrupted" });
+    await db.saveAudio(jobId, "clip.mp3", new Blob(["audio"]));
+    for (let i = 0; i < 3; i++) await noteAutoResume(jobId);
+    vi.mocked(transcribeAudio).mockImplementation(async () => {
+      expect((await getCheckpoint(jobId))?.autoResumes).toBe(0);
+      return transcript;
+    });
+    await runRetry(jobId);
+    await waitForStatus("done");
   });
 });

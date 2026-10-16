@@ -1,0 +1,5 @@
+# Recipe Transcriber — public recipe pages are meant to be found.
+User-agent: *
+Allow: /
+
+Sitemap: https://recipe-transcriber-eu.web.app/sitemap.xml

@@ -73,6 +73,11 @@ self.onmessage = async (ev: MessageEvent<RunRequest>) => {
       chunk_length_s: 30,
       stride_length_s: 5,
       return_timestamps: true,
+      // Without a cap, timestamped generation can run forever on some audio (reproduced:
+      // the outro of the egg-fried-rice eval clip hung indefinitely on both WebGPU and WASM;
+      // capped, it finishes in ~1 s). Whisper's hard limit is 448 tokens per 30 s window,
+      // and even very fast speech with timestamps stays well under 400.
+      max_new_tokens: 400,
     });
 
     const single = Array.isArray(output) ? output[0] : output;

@@ -1,17 +1,19 @@
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { exploreHref, privacyHref, shoppingListHref, termsHref, useRoute, type Route } from "@/lib/router";
-import { Library } from "@/pages/Library";
-import { JobPage } from "@/pages/JobPage";
-import { Settings } from "@/pages/Settings";
-import { Privacy } from "@/pages/Privacy";
-import { Terms } from "@/pages/Terms";
-import { Explore } from "@/pages/Explore";
-import { PublicRecipePage } from "@/pages/PublicRecipePage";
-import { CreatorPage } from "@/pages/CreatorPage";
-import { Admin } from "@/pages/Admin";
-import { ShoppingList } from "@/pages/ShoppingList";
-import { useState } from "react";
+import {
+  Admin,
+  CreatorPage,
+  Explore,
+  JobPage,
+  Library,
+  Privacy,
+  PublicRecipePage,
+  Settings,
+  ShoppingList,
+  Terms,
+} from "@/pages/lazyPages";
+import { Suspense, useState } from "react";
 import { account, backend } from "@/backend";
 import { IS_CLOUD, IS_HOSTED } from "@/lib/mode";
 import { useAccountUser } from "@/lib/useAccount";
@@ -39,10 +41,12 @@ export default function App() {
   const gate: "open" | "restoring" | "signed-out" =
     !IS_CLOUD || OPEN_ROUTES.has(route.name) ? "open" : user === undefined ? "restoring" : user === null ? "signed-out" : "open";
 
+  const loading = <div className="mx-auto max-w-[1120px] px-4 py-10 text-sm text-[hsl(var(--ink-muted))]">Loading…</div>;
+
   const content = onSignInLink ? (
     <EmailLinkLanding onDone={() => setOnSignInLink(false)} />
   ) : gate === "restoring" ? (
-    <div className="mx-auto max-w-[1120px] px-4 py-10 text-sm text-[hsl(var(--ink-muted))]">Loading…</div>
+    loading
   ) : gate === "signed-out" ? (
     <SignedOutLanding />
   ) : route.name === "settings" ? (
@@ -129,7 +133,10 @@ export default function App() {
             </div>
           </div>
         </header>
-        <main className="flex-1">{content}</main>
+        <main className="flex-1">
+          {/* Pages are lazy chunks (pages/lazyPages.ts). */}
+          <Suspense fallback={loading}>{content}</Suspense>
+        </main>
         <footer className="no-print border-t border-[hsl(var(--border))] py-5">
           <div className="mx-auto max-w-[1120px] px-4 flex justify-center gap-4">
             <a

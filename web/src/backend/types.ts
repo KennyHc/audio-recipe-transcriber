@@ -16,6 +16,8 @@ export interface JobProgress {
   label: string;
   /** 0..1 when known; null for indeterminate. */
   fraction: number | null;
+  /** Browser backend, while transcribing: e.g. "Keep this tab open — about 4 min left". */
+  detail?: string | null;
   /** Browser backend only: true when the job is paused waiting for the visitor to confirm
    * the speech-model download via the consent dialog (see ModelDownloadDialog.tsx and
    * backend/browser/runner.ts's startPipeline/resumeAfterModelConsent). Never set by the
@@ -25,6 +27,19 @@ export interface JobProgress {
 
 export interface UploadOptions {
   sourceUrl?: string | null;
+}
+
+/** What the visitor pasted (or the caption file they picked) for "Paste captions instead". */
+export interface CaptionsInput {
+  text: string;
+  /** The caption file's name; null/empty for pasted text ("Pasted captions"). */
+  fileName?: string | null;
+}
+
+export interface CaptionsOptions extends UploadOptions {
+  /** Internal (cloud mode): called once the local job exists, before processing starts — so its
+   * owner and video link are recorded before the finish step reads them. */
+  onJobCreated?: (jobId: string) => void;
 }
 
 export interface Backend {
@@ -53,6 +68,14 @@ export interface Backend {
     onProgress: (fraction: number) => void,
     options?: UploadOptions,
   ): { promise: Promise<Job>; cancel: () => void };
+
+  /** "Paste captions instead" (browser, hosted and cloud modes; false on the local server). */
+  canUseCaptions: boolean;
+
+  /** Create a job from a pasted transcript/captions instead of audio: no speech model, no
+   * transcription — the parsed transcript goes straight to making the recipe. Throws a
+   * user-facing Error for unusable or too-long text. */
+  createFromCaptions(input: CaptionsInput, options?: CaptionsOptions): Promise<Job>;
 
   /** Current stage detail for a running job, or null (server backend: always null). */
   getProgress(id: string): JobProgress | null;

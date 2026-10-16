@@ -11,7 +11,7 @@ import type { CloudRecipe, Usage } from "@recipe/shared";
 import type { FinishStep } from "../browser/runner";
 import * as db from "../browser/db";
 import type { ApiClient } from "./api";
-import { forgetLocalJob, localJobSourceUrl } from "./localJobs";
+import { forgetLocalJob, localJobOwner, localJobSourceUrl } from "./localJobs";
 
 export interface CloudFinishDeps {
   api: Pick<ApiClient, "createRecipe">;
@@ -26,6 +26,10 @@ export const MAKING_RECIPE_LABEL = "Making your recipe";
 export function createCloudFinish(deps: CloudFinishDeps): FinishStep {
   return async (jobId, _source, ctx) => {
     const uid = await deps.requireUid();
+    // A pending upload started by another account on this device (then signed out) is never
+    // sent under this one.
+    const owner = localJobOwner(jobId);
+    if (owner && owner !== uid) throw new Error("This upload belongs to another account — sign in with it to finish.");
     const job = await db.getJob(jobId);
     if (!job) throw new Error("Job not found.");
     const transcript = await db.getTranscript(jobId);

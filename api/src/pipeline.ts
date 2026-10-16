@@ -7,6 +7,7 @@
 import {
   finalizeWarnings,
   normalizeExtractedRecipe,
+  stripTimestampsIfUntimed,
   type Recipe,
   type RecipeWarning,
   type Transcript,
@@ -33,7 +34,8 @@ export async function extractAndVerify(deps: PipelineDeps, transcript: Transcrip
   const raw = await budgetedCall(deps, "extract", deps.config.extractorModel, chars, EXTRACT_MAX_TOKENS, () =>
     deps.claude.extract(transcript),
   );
-  const extracted = normalizeExtractedRecipe(raw);
+  // Pasted plain-text captions have no timing: drop the "0:00" timestamps the model copied.
+  const extracted = stripTimestampsIfUntimed(normalizeExtractedRecipe(raw), transcript);
 
   let warnings: RecipeWarning[];
   try {

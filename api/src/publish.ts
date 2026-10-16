@@ -34,6 +34,7 @@ import { budgetedCall, type PipelineDeps } from "./pipeline";
 import { countUserActionOrThrow, writeUserFields } from "./ratelimit";
 import { recipeRef } from "./recipes";
 import { existingLivePublicId, type FetchLike, isLivePublic, lookupSource, type ResolvedLink, sourceRef } from "./sources";
+import { countStat } from "./stats";
 import { RECIPE_ID_PATTERN } from "./validation";
 
 export interface PublicDeps extends PipelineDeps {
@@ -170,9 +171,10 @@ export async function publishRecipe(
       };
       tx.create(db.collection(PUBLIC_COLLECTIONS.reports).doc(), report);
     }
-    return doc;
+    return { doc, firstPublish: existing === null };
   });
 
+  if (result.firstPublish) await countStat(db, "publish", deps.now(), logger);
   if (screening.flagged) {
     // Cloud Monitoring log-based alert keys on this event. No recipe text or reason here.
     logger.log("WARNING", "publish flagged", {
@@ -181,7 +183,7 @@ export async function publishRecipe(
       screening: screening.unavailable ? "unavailable" : "review",
     });
   }
-  return { publicRecipe: { ...result, id } };
+  return { publicRecipe: { ...result.doc, id } };
 }
 
 function mappedId(data: unknown): string | null {

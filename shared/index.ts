@@ -11,3 +11,5 @@ export * from "./public";
 export * from "./prompts/publishAssist";
 export * from "./shopping";
 export * from "./telemetry";
+export * from "./transcriptText";
+export * from "./stats";

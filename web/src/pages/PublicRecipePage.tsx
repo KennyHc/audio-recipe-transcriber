@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import {
   ArrowLeft,
   Bookmark,
@@ -18,6 +18,7 @@ import {
 import type { PublicRecipe, PublicStats } from "@recipe/shared";
 import { publicBank } from "@/backend";
 import { useAccountUser } from "@/lib/useAccount";
+import { track } from "@/lib/analytics";
 import { creatorHref, exploreHref, jobHref, navigate, publicUrl } from "@/lib/router";
 import { isYouTube, timestampAction, timestampsUseful } from "@/lib/videoSeek";
 import { reviewNotice, tagLabel } from "@/lib/publish";
@@ -28,7 +29,6 @@ import { cn } from "@/lib/utils";
 import { RecipeView } from "@/components/RecipeView";
 import { ServingsScaler } from "@/components/ServingsScaler";
 import { UnitsToggle } from "@/components/UnitsToggle";
-import { CookMode } from "@/components/cook/CookMode";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -130,6 +130,9 @@ function ownerBannerText(pub: PublicRecipe): string {
   }
 }
 
+// Cook mode is opened by few visitors; load it on demand (page-weight pass).
+const CookMode = lazy(() => import("@/components/cook/CookMode").then((m) => ({ default: m.CookMode })));
+
 /** The public recipe page, /r/{id} (cloud mode; works signed out). */
 export function PublicRecipePage({ id }: { id: string }) {
   const user = useAccountUser();
@@ -168,6 +171,7 @@ export function PublicRecipePage({ id }: { id: string }) {
         if (cancelled) return;
         setPub(p);
         setStats(p?.stats ?? null);
+        if (p) track("recipe_view", p.id); // anonymous daily count, once per recipe per session
       })
       .catch((err: unknown) => {
         if (!cancelled) setLoadError(err instanceof Error ? err.message : "Couldn't load this recipe.");
@@ -480,15 +484,17 @@ export function PublicRecipePage({ id }: { id: string }) {
 
       {cookOpen && (
         <AudioAvailableContext.Provider value={false}>
-          <CookMode
-            recipe={recipe}
-            unitSystem={unitSystem}
-            scaleFactor={scaleFactor}
-            checkedIngredients={checked}
-            onToggleIngredient={toggleIngredient}
-            audioRef={audioRef}
-            onClose={() => setCookOpen(false)}
-          />
+          <Suspense fallback={null}>
+            <CookMode
+              recipe={recipe}
+              unitSystem={unitSystem}
+              scaleFactor={scaleFactor}
+              checkedIngredients={checked}
+              onToggleIngredient={toggleIngredient}
+              audioRef={audioRef}
+              onClose={() => setCookOpen(false)}
+            />
+          </Suspense>
         </AudioAvailableContext.Provider>
       )}
 

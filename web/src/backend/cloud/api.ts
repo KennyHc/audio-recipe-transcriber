@@ -5,6 +5,7 @@
 import {
   APP_CHECK_HEADER,
   AdminQueueResponse,
+  AdminStatsResponse,
   CloudError,
   CopyResponse,
   CreateRecipeResponse,
@@ -16,6 +17,7 @@ import {
   ReextractResponse,
   SourcePreview,
   type AdminActionRequest,
+  type BeaconKind,
   type ClientErrorReport,
   type CreateRecipeRequest,
   type ImportRequest,
@@ -70,14 +72,21 @@ export interface ApiClient {
   /** POST /client-errors (shared/telemetry.ts). App Check only; ID token when signed in. Uses a
    * keepalive fetch so it survives the page unloading; never reports its own failures. */
   reportClientError(body: ClientErrorReport): Promise<void>;
+
+  /** POST /beacon (shared/stats.ts): one anonymous daily count. App Check only — never the ID
+   * token, even when signed in. Keepalive; never reports its own failures. */
+  beacon(kind: BeaconKind): Promise<void>;
+  /** GET /admin/stats?days=N (admin claim). Daily totals, oldest first. */
+  adminStats(days: number): Promise<AdminStatsResponse>;
 }
 
 type Method = "GET" | "POST" | "DELETE";
 
 interface RequestOptions {
   forceRefreshToken?: boolean;
-  /** "optional": send the ID token only when signed in (public routes). */
-  auth?: "required" | "optional";
+  /** "optional": send the ID token only when signed in (public routes); "none": never send it
+   * (anonymous routes like /beacon). */
+  auth?: "required" | "optional" | "none";
   keepalive?: boolean;
   /** Don't call onUnexpectedFailure (the error-report route itself). */
   quiet?: boolean;
@@ -103,6 +112,8 @@ const STATIC_SEGMENTS = new Set([
   "client-errors",
   "creators",
   "handle",
+  "beacon",
+  "stats",
 ]);
 
 /** "POST /recipes/abc123/publish?x=1" → "POST /recipes/:id/publish" (no ids, no query). */
@@ -127,6 +138,7 @@ export function createApiClient(deps: ApiClientDeps): ApiClient {
   const doFetch = deps.fetch ?? ((input, init) => fetch(input, init));
 
   async function idTokenFor(options: RequestOptions): Promise<string | null> {
+    if (options.auth === "none") return null;
     if (options.auth === "optional" && deps.isSignedIn && !deps.isSignedIn()) return null;
     const token = await deps.getIdToken(options.forceRefreshToken ?? false);
     if (!token && options.auth !== "optional") throw new Error("Sign in to continue.");
@@ -231,5 +243,7 @@ export function createApiClient(deps: ApiClientDeps): ApiClient {
     adminAction: (publicId, body) => request<void>("POST", `/admin/public/${enc(publicId)}`, null, body),
     reportClientError: (body) =>
       request<void>("POST", "/client-errors", null, body, { auth: "optional", keepalive: true, quiet: true }),
+    beacon: (kind) => request<void>("POST", "/beacon", null, { kind }, { auth: "none", keepalive: true, quiet: true }),
+    adminStats: (days) => request("GET", `/admin/stats?days=${enc(String(days))}`, AdminStatsResponse),
   };
 }

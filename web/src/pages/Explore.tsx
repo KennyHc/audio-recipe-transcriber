@@ -11,6 +11,7 @@ import {
 } from "@/lib/explore";
 import { TAG_GROUP_LABELS, tagLabel } from "@/lib/publish";
 import { cn } from "@/lib/utils";
+import { track } from "@/lib/analytics";
 import { Button } from "@/components/ui/button";
 import { PublicRecipeCard } from "@/components/public/PublicRecipeCard";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -206,6 +207,7 @@ function SortMenu({ tab, onChange }: { tab: ExploreTab; onChange: (t: ExploreTab
 
 /** The public recipe bank (cloud mode; works signed out): Newest · Popular, search, tags. */
 export function Explore() {
+  useEffect(() => track("explore_view"), []); // anonymous daily count, once per session
   const [tab, setTab] = useState<ExploreTab>("newest");
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");

@@ -24,6 +24,11 @@ npm run deploy:api
 VITE_API_BASE=https://api-391833097082.europe-west1.run.app npm run deploy:site:cloud
 ```
 
+Monitoring (emails khechen2018@gmail.com): API uptime check on `/health` ("API is down"), a
+spike in browser error reports (> 20 / 15 min, log metric `client_errors`), API 5xx > 10 / 10
+min, new reports/flagged publishes, and the $20/month GCP budget. Launch numbers: account menu →
+Admin → Stats (anonymous daily totals, shared/stats.ts).
+
 Local development against the emulators: `npm run emulators -w firebase-config`,
 `npm run dev:emulators -w api`, `npm run dev:cloud:emulators -w web` (or the `rt-emulators`,
 `rt-api`, `rt-cloud` launch configs). The emulator's sign-in links are listed at

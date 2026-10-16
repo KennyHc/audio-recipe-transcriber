@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
-import type { Job, Transcript } from "@recipe/shared";
+import { isUntimedTranscript, type Job, type Transcript } from "@recipe/shared";
+import { useAudioAvailable } from "@/lib/audioAvailability";
 import { backend } from "@/backend";
 import { routeIfNeedsSetup } from "@/lib/needsSetup";
 import { IS_CLOUD, IS_HOSTED } from "@/lib/mode";
@@ -84,6 +85,11 @@ export function TranscriptView({
   const [busy, setBusy] = useState<"saving" | "reextracting" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [discardConfirmOpen, setDiscardConfirmOpen] = useState(false);
+
+  // Pasted plain-text captions have no timing: no "0:00" chips. Without audio on this device
+  // (or for a captions recipe), times are shown but rows don't pretend to play anything.
+  const untimed = useMemo(() => isUntimedTranscript(transcript), [transcript]);
+  const canSeek = useAudioAvailable() && !untimed;
 
   const changedIndexes = useMemo(
     () => changedSegmentIndices(transcript.segments, texts),
@@ -170,7 +176,7 @@ export function TranscriptView({
             currentTime !== null && currentTime >= seg.start && currentTime < seg.end;
           const isChanged = changedIndexes.has(i);
 
-          const timestampChip = (
+          const timestampChip = untimed ? null : (
             <button
               type="button"
               onClick={() => onSeek(seg.start)}
@@ -184,6 +190,19 @@ export function TranscriptView({
               {formatTimestamp(seg.start)}
             </button>
           );
+
+          if (!editing && !canSeek) {
+            return (
+              <div key={i} className="flex w-full items-start gap-3 rounded-md px-2 py-1.5">
+                {!untimed && (
+                  <span className="mt-0.5 shrink-0 rounded-full border border-[hsl(var(--border))] px-2 py-0.5 text-xs font-medium tabular-nums text-[hsl(var(--muted-foreground))]">
+                    {formatTimestamp(seg.start)}
+                  </span>
+                )}
+                <span className="text-sm leading-relaxed">{seg.text.trim()}</span>
+              </div>
+            );
+          }
 
           if (!editing) {
             return (

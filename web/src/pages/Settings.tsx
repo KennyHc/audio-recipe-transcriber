@@ -4,6 +4,7 @@ import { consumeSetupMessage } from "@/lib/needsSetup";
 import { getBrowserSettings, saveBrowserSettings, maskApiKey } from "@/backend/settings";
 import { BROWSER_DB_NAME } from "@/backend/constants";
 import { deleteAllModelChunks } from "@/backend/browser/modelDownloader";
+import { deleteAllCheckpoints } from "@/backend/browser/checkpoints";
 import { clearAll } from "@/lib/shopping";
 import { closeDbConnection } from "@/backend/browser/db";
 import { SPEECH_MODEL_CATALOG, speechModelKey } from "@/backend/browser/modelCatalog";
@@ -152,6 +153,7 @@ export function Settings() {
         req.onerror = () => reject(req.error ?? new Error("Failed to delete local database"));
         req.onblocked = () => resolve(); // will complete once other connections close
       });
+      await deleteAllCheckpoints();
       if (typeof caches !== "undefined") {
         const names = await caches.keys();
         await Promise.all(

@@ -13,6 +13,7 @@ import {
   injectPreviewIntoHtml,
   isPlausibleId,
   previewFromPublicDoc,
+  recipeHeadExtras,
 } from "@recipe/shared/previewMeta";
 import type { Firestore } from "firebase-admin/firestore";
 import type { FetchLike } from "./sources";
@@ -57,10 +58,11 @@ export async function previewPage(deps: PreviewDeps, id: string): Promise<string
   if (!isPlausibleId(id)) return html;
   try {
     const snap = await deps.db.collection(PUBLIC_COLLECTIONS.publicRecipes).doc(id).get();
-    const info = previewFromPublicDoc(snap.data());
+    const data = snap.data();
+    const info = previewFromPublicDoc(data);
     if (!info) return html;
     const meta = buildPreviewMeta(info, `${deps.siteOrigin}/r/${encodeURIComponent(id)}`);
-    return injectPreviewIntoHtml(html, meta);
+    return injectPreviewIntoHtml(html, meta, recipeHeadExtras(data, id));
   } catch {
     return html;
   }

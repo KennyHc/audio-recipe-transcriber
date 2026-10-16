@@ -142,10 +142,6 @@ export function canonicalPageUrl(requestUrl: string, publicId: string): string {
 }
 
 /**
- * String version of the Pages Function's HTMLRewriter step, for Node (the API's GET /r/:id):
- * replaces the first <title> and appends the meta tags just before </head>.
- */
-/**
  * The homepage's own preview tags (web/index.html) that a recipe page must replace, not add
  * to — crawlers take the FIRST og:title/og:image they see.
  */
@@ -158,13 +154,108 @@ export function isReplacedPreviewTag(attr: "property" | "name", key: string): bo
 
 const PREVIEW_META_TAG = /<meta\s+(property|name)="([^"]+)"[^>]*>\s*/gi;
 
-export function injectPreviewIntoHtml(html: string, meta: { title: string; tags: MetaTag[] }): string {
+/**
+ * String version of the Pages Function's HTMLRewriter step, for Node (the API's GET /r/:id):
+ * removes the homepage's preview tags, replaces <title>, and appends the recipe's tags (plus
+ * `extraHead`, e.g. recipeHeadExtras) just before </head>.
+ */
+export function injectPreviewIntoHtml(
+  html: string,
+  meta: { title: string; tags: MetaTag[] },
+  extraHead = "",
+): string {
   const withoutHomepageTags = html.replace(PREVIEW_META_TAG, (tag, attr: string, key: string) =>
     isReplacedPreviewTag(attr.toLowerCase() as "property" | "name", key.toLowerCase()) ? "" : tag,
   );
   const withTitle = withoutHomepageTags.replace(/<title>[\s\S]*?<\/title>/i, `<title>${escapeHtml(meta.title)}</title>`);
   const i = withTitle.search(/<\/head>/i);
   if (i === -1) return withTitle;
-  return `${withTitle.slice(0, i)}${renderMetaTags(meta.tags)}\n${withTitle.slice(i)}`;
+  const head = extraHead ? `${renderMetaTags(meta.tags)}\n${extraHead}` : renderMetaTags(meta.tags);
+  return `${withTitle.slice(0, i)}${head}\n${withTitle.slice(i)}`;
 }
 
+// ---------------------------------------------------------------------------
+// Search engines: canonical URL + schema.org Recipe (Google recipe rich results)
+// ---------------------------------------------------------------------------
+
+/** One canonical home for every public page, whichever host served it (pages.dev or web.app). */
+export const CANONICAL_ORIGIN = "https://recipe-transcriber-eu.web.app";
+
+export function canonicalRecipeUrl(publicId: string): string {
+  return `${CANONICAL_ORIGIN}/r/${encodeURIComponent(publicId)}`;
+}
+
+const num = (v: unknown): number | null => (typeof v === "number" && Number.isFinite(v) ? v : null);
+
+/** "2 cloves garlic, minced" from a stored ingredient. */
+function ingredientLine(ing: Record<string, unknown>): string | null {
+  const item = str(ing.item);
+  if (!item) return null;
+  const q = num(ing.quantity);
+  const qty = q === null ? null : Number.isInteger(q) ? String(q) : String(Math.round(q * 100) / 100);
+  const prep = str(ing.prep);
+  return [qty, str(ing.unit), item].filter(Boolean).join(" ") + (prep ? `, ${prep}` : "");
+}
+
+/**
+ * schema.org Recipe for a LIVE public recipe doc (plain object: firebase-admin data, or the
+ * Firestore REST doc via fromFirestoreFields), else null. Only what the recipe actually says:
+ * no invented ratings, times, or nutrition.
+ */
+export function buildRecipeJsonLd(data: Record<string, unknown> | undefined, publicId: string): Record<string, unknown> | null {
+  if (!data || data.status !== "live") return null;
+  const recipe = (data.recipe ?? {}) as Record<string, unknown>;
+  const source = (data.source ?? {}) as Record<string, unknown>;
+  const name = str(recipe.title);
+  if (!name) return null;
+
+  const ingredients = (Array.isArray(recipe.ingredients) ? recipe.ingredients : [])
+    .map((i) => ingredientLine((i ?? {}) as Record<string, unknown>))
+    .filter((l): l is string => l !== null);
+  const steps = (Array.isArray(recipe.steps) ? recipe.steps : [])
+    .map((st) => str(((st ?? {}) as Record<string, unknown>).text))
+    .filter((t): t is string => t !== null)
+    .map((text) => ({ "@type": "HowToStep", text }));
+
+  const channel = source.kind === "own" ? null : str(source.channelName);
+  const handle = str(data.handle);
+  const thumb = str(source.thumbnailUrl);
+  const minutes = num(recipe.totalTimeMinutes);
+  const servings = num(recipe.servings);
+  const tags = Array.isArray(data.tags) ? data.tags.filter((t): t is string => typeof t === "string") : [];
+
+  const ld: Record<string, unknown> = {
+    "@context": "https://schema.org",
+    "@type": "Recipe",
+    name,
+    url: canonicalRecipeUrl(publicId),
+    author: channel
+      ? { "@type": "Person", name: channel, ...(str(source.channelUrl) ? { url: str(source.channelUrl) } : {}) }
+      : { "@type": "Person", name: handle ? `@${handle}` : SITE_NAME },
+    recipeIngredient: ingredients,
+    recipeInstructions: steps,
+  };
+  const description = str(recipe.description);
+  if (description) ld.description = description;
+  if (thumb && /^https:\/\//i.test(thumb)) ld.image = [thumb];
+  if (minutes !== null && minutes > 0) ld.totalTime = `PT${Math.round(minutes)}M`;
+  if (servings !== null && servings > 0) ld.recipeYield = `${servings} servings`;
+  if (tags.length) ld.keywords = tags.join(", ");
+  const published = str(data.publishedAt);
+  if (published) ld.datePublished = published.slice(0, 10);
+  const original = str(source.url);
+  if (original && /^https?:\/\//i.test(original)) ld.isBasedOn = original;
+  return ld;
+}
+
+/** JSON for a <script> body: "<" escaped so recipe text can never close the tag. */
+export function jsonLdScript(ld: Record<string, unknown>): string {
+  return `<script type="application/ld+json">${JSON.stringify(ld).replace(/</g, "\\u003c")}</script>`;
+}
+
+/** Everything a live recipe page adds to <head> beyond the meta tags. */
+export function recipeHeadExtras(data: Record<string, unknown> | undefined, publicId: string): string {
+  const ld = buildRecipeJsonLd(data, publicId);
+  const canonical = `<link rel="canonical" href="${escapeHtml(canonicalRecipeUrl(publicId))}" />`;
+  return ld ? `${canonical}\n${jsonLdScript(ld)}` : canonical;
+}

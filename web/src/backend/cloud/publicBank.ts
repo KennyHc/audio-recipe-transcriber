@@ -239,5 +239,6 @@ export function createPublicBank({ firestore: db, api, currentUid }: PublicBankD
     report: (publicId, body) => api.report(publicId, body),
     adminQueue: () => api.adminQueue(),
     adminAction: (publicId, body) => api.adminAction(publicId, body),
+    adminStats: (days) => api.adminStats(days),
   };
 }

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Job, Recipe, RecipeVersionMeta, Transcript, VersionedRecipe } from "@recipe/shared";
 import { TERMINAL_STATUSES } from "@recipe/shared";
-import { backend, type JobProgress } from "@/backend";
+import { backend, publicBank, type JobProgress } from "@/backend";
 import { navigate, jobHref, cookHref } from "@/lib/router";
 import { routeIfNeedsSetup } from "@/lib/needsSetup";
 import { Stepper } from "@/components/Stepper";
@@ -20,6 +20,10 @@ import { getBrowserSettings, saveBrowserSettings } from "@/backend/settings";
 import { useWakeLock } from "@/lib/processingHealth";
 import { AudioAvailableContext } from "@/lib/audioAvailability";
 import { IS_CLOUD } from "@/lib/mode";
+import { isCaptionsJob } from "@/lib/captions";
+import { setPreferredUploadMode } from "@/lib/uploadMode";
+import { readDeviceFacts } from "@/lib/deviceProfile";
+import { detectVideo } from "@/lib/publish";
 import { PublishControls } from "@/components/publish/PublishControls";
 import { AddToShoppingListButton } from "@/components/shopping/AddToShoppingListButton";
 import { Button } from "@/components/ui/button";
@@ -55,6 +59,8 @@ import {
   Clock,
   MoreHorizontal,
   ChefHat,
+  PlayCircle,
+  Smartphone,
 } from "lucide-react";
 
 const SETUP_WHISPER_COMMAND_RE = /`(npm run setup:whisper)`/;
@@ -185,6 +191,28 @@ export function JobPage({ jobId, cookRoute }: { jobId: string; cookRoute: boolea
   // merely queued/waiting for model-download consent, where nothing is happening yet.
   const isProcessing = job?.status === "transcribing" || job?.status === "extracting" || job?.status === "verifying";
   useWakeLock(isProcessing);
+
+  // Made from pasted captions: there is no audio anywhere (no player, no click-to-hear), and
+  // nothing to re-transcribe.
+  const fromCaptions = job ? isCaptionsJob(job) : false;
+  const canPlayAudio = audioAvailable && !fromCaptions;
+  const [isPhone] = useState(() => readDeviceFacts().mobile);
+  // Cloud: the owner's video link, for "Watch the video" on a captions recipe from YouTube.
+  const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  useEffect(() => {
+    setVideoUrl(null);
+    if (!publicBank || !fromCaptions || job?.status !== "done") return;
+    let cancelled = false;
+    publicBank
+      .getSourceUrl(jobId)
+      .then((url) => {
+        if (!cancelled) setVideoUrl(url && detectVideo(url)?.platform === "youtube" ? url : null);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [jobId, fromCaptions, job?.status]);
 
   // The first time this job is seen waiting for model-download consent, open the dialog
   // automatically. If the visitor cancels, autoPromptedRef stays true so we don't re-open it
@@ -448,7 +476,7 @@ export function JobPage({ jobId, cookRoute }: { jobId: string; cookRoute: boolea
   return (
     <div
       className={
-        job.status === "done" && audioAvailable
+        job.status === "done" && canPlayAudio
           ? "mx-auto max-w-[1120px] px-4 py-6 pb-24 space-y-6"
           : "mx-auto max-w-[1120px] px-4 py-6 pb-6 space-y-6"
       }
@@ -465,7 +493,7 @@ export function JobPage({ jobId, cookRoute }: { jobId: string; cookRoute: boolea
           <p className="text-sm font-medium text-[hsl(var(--ink))] truncate">
             {job.title ?? job.fileName}
           </p>
-          <Stepper status={job.status} />
+          <Stepper status={job.status} fromCaptions={fromCaptions} />
           {progress?.awaitingModelConsent ? (
             <div className="space-y-2">
               <p className="text-sm text-[hsl(var(--ink-muted))]">{progress.label}</p>
@@ -479,6 +507,7 @@ export function JobPage({ jobId, cookRoute }: { jobId: string; cookRoute: boolea
                   counts, rate, ETA) for the download stage — see lib/downloadProgress.ts —
                   so it's shown as-is, without an extra "— NN%" appended. */}
               <p className="text-sm text-[hsl(var(--ink-muted))]">{progress.label}</p>
+              {progress.detail && <p className="text-sm font-medium text-[hsl(var(--ink))]">{progress.detail}</p>}
               {progress.fraction !== null && (
                 <div className="h-1 w-full max-w-sm rounded-full bg-[hsl(var(--sunken))] overflow-hidden">
                   <div
@@ -491,10 +520,20 @@ export function JobPage({ jobId, cookRoute }: { jobId: string; cookRoute: boolea
           ) : (
             <p className="text-sm text-[hsl(var(--ink-muted))]">This usually takes 1–3 minutes.</p>
           )}
-          {isProcessing && (
+          {isProcessing && !progress?.detail && !fromCaptions && (
             <p className="text-xs text-[hsl(var(--ink-faint))]">
               Keep this tab open and in front — background tabs process more slowly.
             </p>
+          )}
+          {job.status === "transcribing" && isPhone && !fromCaptions && backend.canUseCaptions && (
+            <a
+              href="#/"
+              onClick={() => setPreferredUploadMode("captions")}
+              className="inline-flex items-center gap-1.5 text-xs text-[hsl(var(--accent-text))] underline-offset-4 hover:underline"
+            >
+              <Smartphone className="h-3.5 w-3.5 shrink-0" />
+              Faster on phones: paste the video's captions instead
+            </a>
           )}
         </div>
       )}
@@ -520,6 +559,11 @@ export function JobPage({ jobId, cookRoute }: { jobId: string; cookRoute: boolea
               <Button size="sm" onClick={handleRetry} disabled={retrying}>
                 <RefreshCw className="h-4 w-4" /> {retrying ? "Retrying…" : "Retry"}
               </Button>
+            ) : fromCaptions ? (
+              // No audio to start over from: Retry makes the recipe again from the captions.
+              <Button size="sm" onClick={handleRetry} disabled={retrying}>
+                <RefreshCw className="h-4 w-4" /> {retrying ? "Retrying…" : "Retry"}
+              </Button>
             ) : transcript ? (
               <>
                 <Button size="sm" onClick={() => setReextractConfirmOpen(true)}>
@@ -542,7 +586,7 @@ export function JobPage({ jobId, cookRoute }: { jobId: string; cookRoute: boolea
       )}
 
       {job.status === "done" && displayedRecipe && (
-        <AudioAvailableContext.Provider value={audioAvailable}>
+        <AudioAvailableContext.Provider value={canPlayAudio}>
           {isViewingOld && displayedMeta && (
             <div className="no-print flex items-center justify-between rounded-[10px] border border-[hsl(var(--accent-tint-strong))] bg-[hsl(var(--accent-tint))] px-4 py-2 text-sm">
               <span className="text-[hsl(var(--accent-text))]">
@@ -580,10 +624,26 @@ export function JobPage({ jobId, cookRoute }: { jobId: string; cookRoute: boolea
                     {displayedRecipe.description && (
                       <p className="text-[hsl(var(--ink-muted))]">{displayedRecipe.description}</p>
                     )}
-                    {!audioAvailable && (
-                      <p className="no-print text-xs text-[hsl(var(--ink-faint))]">
-                        The audio for this recipe is on the device you uploaded it from.
-                      </p>
+                    {fromCaptions ? (
+                      <div className="no-print flex flex-wrap items-center gap-x-3 gap-y-1.5">
+                        <p className="text-xs text-[hsl(var(--ink-faint))]">Made from the video's captions.</p>
+                        {videoUrl && (
+                          <a
+                            href={videoUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-1.5 text-sm font-medium text-[hsl(var(--accent-text))] underline-offset-4 hover:underline"
+                          >
+                            <PlayCircle className="h-4 w-4" /> Watch the video
+                          </a>
+                        )}
+                      </div>
+                    ) : (
+                      !audioAvailable && (
+                        <p className="no-print text-xs text-[hsl(var(--ink-faint))]">
+                          The audio for this recipe is on the device you uploaded it from.
+                        </p>
+                      )
                     )}
                     <p className="text-xs tabular-nums text-[hsl(var(--ink-faint))]">
                       {[
@@ -732,13 +792,18 @@ export function JobPage({ jobId, cookRoute }: { jobId: string; cookRoute: boolea
             }}
           />
 
-          <AudioPlayer
-            ref={audioRef}
-            jobId={jobId}
-            title={job.title ?? job.fileName}
-            activeStepText={activeStepText}
-            onAvailabilityChange={setAudioAvailable}
-          />
+          {fromCaptions ? (
+            // Keeps the ref valid for cook mode; there is nothing to play.
+            <audio ref={audioRef} preload="none" className="hidden" />
+          ) : (
+            <AudioPlayer
+              ref={audioRef}
+              jobId={jobId}
+              title={job.title ?? job.fileName}
+              activeStepText={activeStepText}
+              onAvailabilityChange={setAudioAvailable}
+            />
+          )}
 
           {cookOpen && !editing && !isViewingOld && (
             <CookMode

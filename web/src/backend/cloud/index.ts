@@ -16,6 +16,7 @@ import { createPublicBank } from "./publicBank";
 import { createCloudShoppingStore, firestoreShoppingIO } from "./shoppingList";
 import type { ShoppingListStore } from "../shoppingList";
 import { errorReporter } from "@/lib/errorReporting";
+import { createBeaconSender, setAnalyticsSender } from "@/lib/analytics";
 
 function createUsageCache(): UsageCache {
   let me: MeResponse | null = null;
@@ -58,6 +59,9 @@ export function createCloudRuntime(): {
   });
   // Error reports go to the API (fire-and-forget; see lib/errorReporting.ts).
   errorReporter.setSender((report) => api.reportClientError(report));
+  // Anonymous daily counts (lib/analytics.ts): App Check only, no ID token, once per kind per
+  // page session, nothing under Do Not Track / Global Privacy Control.
+  setAnalyticsSender(createBeaconSender({ post: (kind) => api.beacon(kind) }));
 
   const store = createRecipeStore(firebase.firestore);
 

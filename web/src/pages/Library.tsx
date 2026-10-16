@@ -205,8 +205,9 @@ export function Library() {
               Turn cooking audio into recipes
             </h1>
             <p className="text-[hsl(var(--ink-muted))] max-w-[60ch]">
-              Upload one audio recording of someone talking through a recipe — get a structured,
-              verifiable recipe back.
+              {backend.canUseCaptions
+                ? "Upload a recording of someone talking through a recipe — or paste a video's captions — and get a structured, verifiable recipe back."
+                : "Upload one audio recording of someone talking through a recipe — get a structured, verifiable recipe back."}
             </p>
           </div>
 
