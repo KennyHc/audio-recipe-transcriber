@@ -70,6 +70,8 @@ held for review and its creator couldn't see why; it went public tagged Chinese/
 | 12 | Public pages say "notes from the video" instead of "things to double-check" | S | ✅ |
 | 13 | Nudges to grow the bank ("Publish your first recipe") | S | ✅ |
 
+Next candidate (planned, not built): optional cloud transcription — see CLOUD-TRANSCRIPTION-PLAN.md.
+
 Also: Explore re-composed (heading, search, and grid share one column; sticky toolbar).
 
 Housekeeping: raise the Anthropic Console limit when usage grows; retire the anonymous
